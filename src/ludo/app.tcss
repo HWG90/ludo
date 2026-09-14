@@ -67,6 +67,10 @@ HomeView, WeekView, GlossaryView, GamingView, CheckupView, CommandsView, ChatVie
     height: 1fr;
 }
 
+ChatView {
+    overflow-y: hidden;
+}
+
 #ask-bar {
     height: 3;
     width: 100%;
@@ -91,10 +95,12 @@ HomeView, WeekView, GlossaryView, GamingView, CheckupView, CommandsView, ChatVie
 
 #chat-log {
     height: 1fr;
+    min-height: 0;
     margin-top: 1;
     background: $surface;
     border: round $border-blurred;
     padding: 1 2;
+    overflow-y: auto;
 }
 
 #glossary-results, #cmd-results, #week-list {

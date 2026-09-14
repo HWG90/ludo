@@ -49,6 +49,8 @@ class ChatView(Vertical):
         return f"Using {label} on this machine. Nothing is sent to the cloud."
 
     def on_mount(self) -> None:
+        log = self.query_one("#chat-log", VerticalScroll)
+        log.anchor()
         self.refresh_log()
 
     def refresh_log(self) -> None:
@@ -70,6 +72,7 @@ class ChatView(Vertical):
             if turn.role == "ludo" and turn.guide_id:
                 log.mount(GuideButton(f"Open guide: {turn.guide_id}", turn.guide_id))
             log.mount(Static(" "))
+        log.scroll_end(animate=False)
 
     def on_button_pressed(self, event: GuideButton.Pressed) -> None:
         if isinstance(event.button, GuideButton):

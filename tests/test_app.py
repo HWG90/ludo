@@ -148,3 +148,24 @@ def test_unknown_saved_theme_falls_back_to_ludo() -> None:
             assert app.theme == "ludo"
 
     asyncio.run(scenario())
+
+
+def test_chat_scrolls_to_latest() -> None:
+    from ludo.ui.chat import ChatTurn
+
+    async def scenario() -> None:
+        app = LudoApp(profile=make_profile(), progress=Progress())
+        async with app.run_test(size=(80, 18)) as pilot:
+            await pilot.pause()
+            for index in range(15):
+                app.chat.append(ChatTurn("you", f"question {index}"))
+                app.chat.append(
+                    ChatTurn("ludo", "Proton runs the Windows game on Linux.\n" * 4)
+                )
+            app.switch_view("ask")
+            await pilot.pause()
+            log = app.query_one("#chat-log")
+            assert log.max_scroll_y > 0
+            assert log.scroll_offset.y == log.max_scroll_y
+
+    asyncio.run(scenario())
