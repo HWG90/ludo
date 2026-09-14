@@ -69,7 +69,7 @@ def test_ollama_complete(monkeypatch) -> None:
         assert payload["model"] == "qwen2.5:1.5b"
         options = payload["options"]
         assert options["repeat_penalty"] >= 1.1
-        assert options["num_predict"] >= 256
+        assert options["num_predict"] >= 2048
         return {"message": {"content": "Use Proton in Steam compatibility."}}
 
     monkeypatch.setattr("ludo.llm._post_json", fake_post)
@@ -78,7 +78,7 @@ def test_ollama_complete(monkeypatch) -> None:
     assert "Proton" in text
 
 
-def test_ollama_tidies_loop(monkeypatch) -> None:
+def test_looks_like_loop() -> None:
     from ludo.llm import looks_like_loop, tidy_reply
 
     ramble = (
@@ -96,14 +96,32 @@ def test_ollama_tidies_loop(monkeypatch) -> None:
     )
     assert looks_like_loop(ramble, tidy_reply(ramble))
 
+
+def test_ollama_keeps_a_full_list(monkeypatch) -> None:
+    body = (
+        "I recommend these three steps:\n\n"
+        "**1. Use tldr**\n"
+        "Install it with `sudo pacman -S tldr`.\n\n"
+        "**2. Master the Survival Five**\n"
+        "* `pwd` - Print Working Directory\n"
+        "* `ls` - List files\n"
+        "* `cd` - Change Directory\n"
+        "* `mkdir` - Make a folder\n"
+        "* `rm` - Remove a file\n\n"
+        "**3. Practice on your own files**\n"
+        "Stay in your home folder while you learn.\n"
+    )
+
     def fake_post(url: str, payload: dict, timeout: float) -> dict:
-        return {"message": {"content": ramble}}
+        return {"message": {"content": body}}
 
     monkeypatch.setattr("ludo.llm._post_json", fake_post)
-    brain = OllamaBrain(host="http://127.0.0.1:11434", model="qwen2.5:1.5b")
-    text = brain.complete("commands for ludo", "notes: Ludo has a command map.", [])
-    assert "pacman" in text
-    assert len(text) < len(ramble)
+    brain = OllamaBrain(host="http://127.0.0.1:11434", model="gemma3:27b")
+    text = brain.complete("How could I quickly familiarize myself with terminal commands", "", [])
+    assert "* `pwd`" in text
+    assert "* `ls`" in text
+    assert "* `rm`" in text
+    assert "**3. Practice" in text
 
 
 def test_model_is_tiny() -> None:
@@ -169,6 +187,6 @@ def test_http_error_model_missing() -> None:
 def test_large_model_gets_longer_timeout() -> None:
     from ludo.llm import _ollama_timeout
 
-    assert _ollama_timeout("qwen2.5:7b") >= 90
-    assert _ollama_timeout("gemma3:27b") >= 200
-    assert _ollama_timeout("gemma3:27b") <= 300
+    assert _ollama_timeout("qwen2.5:7b") >= 120
+    assert _ollama_timeout("gemma3:27b") >= 300
+    assert _ollama_timeout("gemma3:27b") <= 480

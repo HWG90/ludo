@@ -10,8 +10,8 @@ from typing import Protocol
 
 DEFAULT_QWEN = "qwen2.5:7b"
 DEFAULT_GEMINI = "gemini-3.1-flash-lite"
-OLLAMA_TIMEOUT = 90
-GEMINI_TIMEOUT = 60
+OLLAMA_TIMEOUT = 120
+GEMINI_TIMEOUT = 120
 PROBE_TIMEOUT = 0.4
 TINY_BILLION_PARAMS = 3.0
 _LINE_STOP = frozenset(
@@ -28,7 +28,6 @@ Talk like a knowledgeable enthusiast helping a friend, not a marketer and not a 
 Do:
 - Answer the actual question in your own words.
 - Use the computer facts when the question is about this machine.
-- Treat the handbook snippet as optional background, not a script to recite.
 - Be honest when you are unsure. Prefer official docs (Arch Wiki, distro docs, man pages) over guessing.
 - Never pretend you ran a command on the user's PC. Never tell anyone to disable security features.
 
@@ -37,14 +36,14 @@ Don't:
 - Pad with repeated bullets or unrelated hostname/user trivia.
 - Use slang like “gg”, “skill issue”, “the penguin”, or similar.
 
-Length: as long as the question needs — usually a short paragraph or a few bullets. No markdown tables."""
+Finish the answer. If you start a numbered list or a set of steps, complete it. No markdown tables."""
 
 _OLLAMA_OPTIONS = {
     "temperature": 0.65,
     "top_p": 0.9,
     "repeat_penalty": 1.15,
     "repeat_last_n": 128,
-    "num_predict": 768,
+    "num_predict": 4096,
 }
 
 
@@ -113,7 +112,7 @@ class GeminiBrain:
         payload = {
             "system_instruction": {"parts": [{"text": system}]},
             "contents": contents,
-            "generationConfig": {"temperature": 0.65, "maxOutputTokens": 1024},
+            "generationConfig": {"temperature": 0.65, "maxOutputTokens": 4096},
         }
         url = (
             "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -313,7 +312,7 @@ def tidy_reply(text: str) -> str:
         seen.append(norm)
         kept.append(stripped)
         nonempty += 1
-        if nonempty >= 48:
+        if nonempty >= 200:
             break
     while kept and kept[-1] == "":
         kept.pop()
@@ -356,15 +355,31 @@ def _usable_history(history: list[tuple[str, str]]) -> list[tuple[str, str]]:
 
 def _ollama_timeout(model: str) -> float:
     size = model_param_billions(model) or 7.0
-    return min(300.0, max(float(OLLAMA_TIMEOUT), size * 8.0))
+    return min(480.0, max(float(OLLAMA_TIMEOUT), size * 12.0))
 
 
 def _finalize_reply(text: str) -> str:
     raw = (text or "").strip()
-    cleaned = tidy_reply(raw)
-    if not cleaned:
+    if not raw:
         raise RuntimeError("empty reply")
-    return cleaned
+    return _collapse_blank_lines(raw)
+
+
+def _collapse_blank_lines(text: str) -> str:
+    lines = [line.rstrip() for line in text.replace("\r\n", "\n").split("\n")]
+    kept: list[str] = []
+    blank = 0
+    for line in lines:
+        if line.strip():
+            kept.append(line)
+            blank = 0
+            continue
+        blank += 1
+        if blank <= 1:
+            kept.append("")
+    while kept and kept[-1] == "":
+        kept.pop()
+    return "\n".join(kept).strip()
 
 
 def _normalize_line(line: str) -> str:

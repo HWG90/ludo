@@ -1,6 +1,6 @@
 # Maintainer: HWG90
 pkgname=ludo-git
-pkgver=0.1.9.r0.g0000000
+pkgver=0.1.10.r0.g0000000
 pkgrel=1
 pkgdesc="Terminal Linux guide for people coming from Windows"
 arch=('any')
@@ -15,7 +15,7 @@ sha256sums=('SKIP')
 
 pkgver() {
   cd ludo
-  printf "0.1.9.r%s.g%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+  printf "0.1.10.r%s.g%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
 }
 
 package() {
