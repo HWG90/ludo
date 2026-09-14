@@ -3,13 +3,14 @@ from __future__ import annotations
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
+from textual.theme import Theme
 from textual.widgets import Button, Footer, Header, Input, Static
 from textual.worker import Worker, WorkerState
 
 from ludo.ask import Answer, answer_question
 from ludo.content.catalog import next_incomplete
 from ludo.llm import Brain, detect_backend
-from ludo.ollama_setup import inspect_ollama, should_autostart, should_prompt
+from ludo.ollama_setup import inspect_ollama, should_autostart, should_prompt, stop_ludo_ollama
 from ludo.probe import SystemProfile, probe
 from ludo.progress import Progress, load_progress, save_progress
 from ludo.ui.chat import AskBar, ChatTurn, ChatView
@@ -41,6 +42,21 @@ VIEWS = {
     "ask": ChatView,
 }
 
+LUDO_THEME = Theme(
+    name="ludo",
+    primary="#c9a227",
+    secondary="#e6c36a",
+    accent="#c9a227",
+    foreground="#f0e6d8",
+    background="#12110e",
+    surface="#1c1916",
+    panel="#191613",
+    success="#8fbf88",
+    warning="#e6c36a",
+    error="#e09080",
+    dark=True,
+)
+
 
 class LudoApp(App):
     CSS_PATH = "app.tcss"
@@ -67,6 +83,7 @@ class LudoApp(App):
 
     def __init__(self, profile: SystemProfile | None = None, progress: Progress | None = None) -> None:
         super().__init__()
+        self.register_theme(LUDO_THEME)
         self.profile = profile if profile is not None else probe()
         self.progress = progress if progress is not None else load_progress()
         self.current_view = "home"
@@ -86,6 +103,8 @@ class LudoApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
+        if self.theme == "textual-dark":
+            self.theme = "ludo"
         try:
             self.brain = detect_backend()
         except RuntimeError as exc:
@@ -93,6 +112,9 @@ class LudoApp(App):
             self.notify(str(exc), severity="warning", timeout=8)
         self.switch_view("home")
         self._boot_ollama()
+
+    def on_unmount(self) -> None:
+        stop_ludo_ollama()
 
     def _boot_ollama(self) -> None:
         status = inspect_ollama()
@@ -244,4 +266,7 @@ class LudoApp(App):
 
 
 def run() -> None:
-    LudoApp().run()
+    try:
+        LudoApp().run()
+    finally:
+        stop_ludo_ollama()

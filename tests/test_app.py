@@ -40,6 +40,36 @@ def test_app_navigation() -> None:
     asyncio.run(scenario())
 
 
+def test_theme_changes_app_chrome() -> None:
+    async def scenario() -> None:
+        app = LudoApp(profile=make_profile(), progress=Progress())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert app.theme == "ludo"
+            sidebar = app.query_one("#sidebar")
+            ludo_screen = app.screen.styles.background
+            ludo_sidebar = sidebar.styles.background
+            app.theme = "textual-light"
+            await pilot.pause()
+            assert app.screen.styles.background != ludo_screen
+            assert sidebar.styles.background != ludo_sidebar
+
+    asyncio.run(scenario())
+
+
+def test_app_stops_ollama_on_exit(monkeypatch) -> None:
+    stopped: list[bool] = []
+    monkeypatch.setattr("ludo.app.stop_ludo_ollama", lambda: stopped.append(True))
+
+    async def scenario() -> None:
+        app = LudoApp(profile=make_profile(), progress=Progress())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+        assert stopped
+
+    asyncio.run(scenario())
+
+
 def test_ollama_setup_prompt(monkeypatch) -> None:
     monkeypatch.setenv("LUDO_LLM", "auto")
     missing = OllamaStatus(binary=None, running=False, model_present=False, model="qwen2.5:1.5b")

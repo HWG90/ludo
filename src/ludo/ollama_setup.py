@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import atexit
 import json
 import os
 import platform
 import shutil
+import signal
 import stat
 import subprocess
 import tarfile
@@ -26,6 +28,9 @@ from ludo.paths import xdg_data_home
 from ludo.progress import Progress
 
 ProgressFn = Callable[[str], None]
+
+_owned_pid: int | None = None
+_atexit_registered = False
 
 
 @dataclass(frozen=True)
@@ -186,13 +191,29 @@ def _extract_binary(archive: Path, dest: Path) -> None:
         dest.write_bytes(extracted.read())
 
 
+def pidfile_path() -> Path:
+    return xdg_data_home() / "ludo" / "ollama.pid"
+
+
+def owned_ollama_pid() -> int | None:
+    global _owned_pid
+    if _owned_pid is not None and _is_ollama_serve(_owned_pid):
+        return _owned_pid
+    pid = _read_pidfile()
+    if pid is not None and _is_ollama_serve(pid):
+        _owned_pid = pid
+        return pid
+    return None
+
+
 def start_daemon(binary: Path) -> None:
     if ollama_is_running():
+        owned_ollama_pid()
         return
     log_path = xdg_data_home() / "ludo" / "ollama.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("ab") as log:
-        subprocess.Popen(
+        proc = subprocess.Popen(
             [str(binary), "serve"],
             stdout=log,
             stderr=log,
@@ -200,6 +221,120 @@ def start_daemon(binary: Path) -> None:
             start_new_session=True,
             env=os.environ.copy(),
         )
+    _remember_owned(proc.pid)
+
+
+def stop_ludo_ollama() -> None:
+    """Stop an Ollama daemon that Ludo started. Leave someone else's serve alone."""
+    global _owned_pid
+    pid = owned_ollama_pid()
+    if pid is None:
+        return
+    _stop_model_quietly()
+    _terminate_pid(pid)
+    _owned_pid = None
+    _clear_pidfile()
+
+
+def _remember_owned(pid: int) -> None:
+    global _owned_pid
+    _owned_pid = pid
+    path = pidfile_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(str(pid), encoding="utf-8")
+    _ensure_atexit()
+
+
+def _ensure_atexit() -> None:
+    global _atexit_registered
+    if _atexit_registered:
+        return
+    atexit.register(stop_ludo_ollama)
+    _atexit_registered = True
+
+
+def _read_pidfile() -> int | None:
+    try:
+        raw = pidfile_path().read_text(encoding="utf-8").strip()
+        pid = int(raw)
+    except (OSError, ValueError):
+        return None
+    return pid if pid > 0 else None
+
+
+def _clear_pidfile() -> None:
+    pidfile_path().unlink(missing_ok=True)
+
+
+def _is_ollama_serve(pid: int) -> bool:
+    try:
+        raw = Path(f"/proc/{pid}/cmdline").read_bytes()
+    except OSError:
+        return False
+    parts = raw.decode("utf-8", errors="replace").split("\x00")
+    names = [Path(part).name for part in parts if part]
+    return "ollama" in names and "serve" in parts
+
+
+def _stop_model_quietly() -> None:
+    binary = find_ollama()
+    if binary is None:
+        return
+    try:
+        subprocess.run(
+            [str(binary), "stop", ollama_model()],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
+def _terminate_pid(pid: int) -> None:
+    if not _signal_pid(pid, signal.SIGTERM):
+        return
+    if _wait_exit(pid, 4.0):
+        return
+    _signal_pid(pid, signal.SIGKILL)
+    _wait_exit(pid, 1.0)
+
+
+def _signal_pid(pid: int, sig: int) -> bool:
+    try:
+        os.killpg(pid, sig)
+        return True
+    except ProcessLookupError:
+        return False
+    except OSError:
+        try:
+            os.kill(pid, sig)
+            return True
+        except ProcessLookupError:
+            return False
+        except OSError:
+            return False
+
+
+def _wait_exit(pid: int, timeout: float) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return True
+        except PermissionError:
+            time.sleep(0.1)
+            continue
+        time.sleep(0.1)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    except OSError:
+        return False
+    return False
 
 
 def _wait_until_running(*, timeout: float) -> None:
