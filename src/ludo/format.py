@@ -46,6 +46,8 @@ def profile_facts(profile: SystemProfile) -> list[tuple[str, str]]:
     desktop = profile.desktop or "unknown"
     return [
         ("Distro", profile.distro_name),
+        ("Hostname", profile.hostname or "unknown"),
+        ("User", profile.username or "unknown"),
         ("Kernel", profile.kernel or "unknown"),
         ("Desktop", f"{desktop} ({session})"),
         ("CPU", profile.cpu or "unknown"),
@@ -87,6 +89,7 @@ def profile_to_dict(profile: SystemProfile) -> dict:
         "mangohud": profile.mangohud,
         "gamescope": profile.gamescope,
         "hostname": profile.hostname,
+        "username": profile.username,
         "cpu": profile.cpu,
         "memory_gb": profile.memory_gb,
     }

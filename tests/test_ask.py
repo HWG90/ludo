@@ -93,3 +93,28 @@ def test_tiny_ollama_keeps_ludo_command_notes() -> None:
     assert answer.source == "ludo"
     assert "ludo checkup" in answer.text
     assert called == []
+
+
+def test_system_name_uses_this_pc() -> None:
+    answer = answer_question("What is my system name", make_profile(), use_llm=False)
+    assert answer.source == "machine"
+    assert "testbox" in answer.text
+    assert "tester" in answer.text
+    assert answer.guide_id is None
+
+
+def test_tiny_ollama_keeps_hostname_facts() -> None:
+    from ludo.llm import OllamaBrain
+
+    called: list[str] = []
+
+    class QuietOllama(OllamaBrain):
+        def complete(self, question: str, context: str, history: list[tuple[str, str]]) -> str:
+            called.append(question)
+            return "Your computer name is /home/you on NTFS."
+
+    brain = QuietOllama(host="http://127.0.0.1:11434", model="qwen2.5:1.5b")
+    answer = answer_question("What is my system name", make_profile(), backend=brain)
+    assert answer.source == "machine"
+    assert "testbox" in answer.text
+    assert called == []

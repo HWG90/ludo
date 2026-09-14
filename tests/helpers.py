@@ -21,6 +21,7 @@ def make_profile(**overrides: object) -> SystemProfile:
         mangohud=False,
         gamescope=False,
         hostname="testbox",
+        username="tester",
         cpu="Test CPU",
         memory_gb=16.0,
     )

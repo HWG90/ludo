@@ -56,6 +56,21 @@ _COMMAND_OVERVIEW = (
     "dxdiag",
 )
 
+_IDENTITY_HINTS = frozenset({"hostname", "username", "whoami"})
+_IDENTITY_PHRASES = (
+    "system name",
+    "computer name",
+    "pc name",
+    "device name",
+    "machine name",
+    "host name",
+    "my hostname",
+    "my username",
+    "user name",
+    "account name",
+    "who am i",
+)
+
 _MACHINE_HINTS = frozenset(
     {
         "gpu",
@@ -166,14 +181,15 @@ def answer_from_notes(query: str, profile: SystemProfile | None = None) -> Answe
 
 
 def _context_pack(query: str, profile: SystemProfile | None, notes: Answer) -> str:
-    chunks = [f"Question: {query}", f"Best local note ({notes.source}):\n{notes.text}"]
+    chunks = [f"Question: {query}"]
     if profile is not None:
-        facts = "\n".join(f"{key}: {value}" for key, value in profile_facts(profile)[:8])
-        chunks.append("This PC:\n" + facts)
+        facts = "\n".join(f"{key}: {value}" for key, value in profile_facts(profile)[:10])
+        chunks.append("This PC (use these values when the question is about this computer):\n" + facts)
+    chunks.append(f"Best local note ({notes.source}):\n{notes.text}")
     if notes.guide_id:
         try:
             body = load_guide_text(get_guide(notes.guide_id)).strip()
-            chunks.append("Guide excerpt:\n" + body[:1600])
+            chunks.append("Guide excerpt (only if the question is about this topic):\n" + body[:900])
         except OSError:
             pass
     return "\n\n".join(chunks)[:4000]
@@ -265,7 +281,7 @@ def _best_guide(query: str, tokens: tuple[str, ...]) -> tuple[int, Answer] | Non
     scored: list[tuple[int, Guide]] = []
     for guide in GUIDES:
         blob = " ".join((guide.id, guide.title, guide.summary, guide.windows_hook, guide.section)).lower()
-        overlap = sum(1 for token in tokens if token in blob or token.replace("-", "") in blob.replace("-", ""))
+        overlap = sum(1 for token in tokens if _blob_has_token(blob, token))
         bonus = 0
         id_parts = set(guide.id.split("-"))
         if guide.id.replace("-", " ") in query.lower() or guide.id in query.lower():
@@ -290,6 +306,8 @@ def _best_guide(query: str, tokens: tuple[str, ...]) -> tuple[int, Answer] | Non
 
 
 def _machine_score(tokens: tuple[str, ...], lowered: str) -> int:
+    if _is_identity_query(lowered, tokens):
+        return 110
     hits = sum(1 for token in tokens if token in _MACHINE_HINTS)
     phrases = ("this pc", "this machine", "my pc", "my computer", "do i have", "is steam")
     if any(phrase in lowered for phrase in phrases):
@@ -302,6 +320,18 @@ def _machine_score(tokens: tuple[str, ...], lowered: str) -> int:
 def _machine_answer(query: str, profile: SystemProfile) -> Answer:
     lowered = query.lower()
     facts = dict(profile_facts(profile))
+    if _is_identity_query(lowered, _tokens(query)):
+        host = profile.hostname or "unknown"
+        user = profile.username or "unknown"
+        home = f"/home/{user}" if user != "unknown" else "~"
+        return Answer(
+            f"This PC’s hostname is `{host}`.\n"
+            f"Your Linux user is `{user}` (home folder `{home}`).\n"
+            "Windows called these the computer name and the account name. "
+            "`hostname` and `whoami` print the same thing.",
+            source="machine",
+            title=host if host != "unknown" else "This PC",
+        )
     if any(word in lowered for word in ("steam", "proton")):
         install = pick(STEAM, profile)
         extra = "" if profile.steam.installed else f"\nWhen you are ready: {install}"
@@ -331,6 +361,18 @@ def _machine_answer(query: str, profile: SystemProfile) -> Answer:
     )
 
 
+def _is_identity_query(lowered: str, tokens: tuple[str, ...]) -> bool:
+    if any(phrase in lowered for phrase in _IDENTITY_PHRASES):
+        return True
+    return any(token in _IDENTITY_HINTS for token in tokens)
+
+
+def _blob_has_token(blob: str, token: str) -> bool:
+    if len(token) <= 4:
+        return re.search(rf"\b{re.escape(token)}\b", blob) is not None
+    return token in blob or token.replace("-", "") in blob.replace("-", "")
+
+
 def _is_chitchat(query: str) -> bool:
     cleaned = query.strip().lower().rstrip("!.?")
     return cleaned in _CHITCHAT
@@ -349,7 +391,7 @@ def _skip_tiny_llm(brain: object, notes: Answer) -> bool:
         return False
     if not model_is_tiny(str(getattr(brain, "model", ""))):
         return False
-    return notes.source in {"miss", "help", "commands", "ludo", "chat", "command"}
+    return notes.source in {"miss", "help", "commands", "ludo", "chat", "command", "machine"}
 
 
 def _ludo_score(tokens: tuple[str, ...], lowered: str) -> int:

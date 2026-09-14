@@ -53,6 +53,7 @@ class SystemProfile:
     mangohud: bool = False
     gamescope: bool = False
     hostname: str = ""
+    username: str = ""
     cpu: str = ""
     memory_gb: float | None = None
 
@@ -100,6 +101,7 @@ def probe(env: dict[str, str] | None = None, os_release_path: Path | None = None
         mangohud=shutil.which("mangohud") is not None,
         gamescope=shutil.which("gamescope") is not None,
         hostname=os.uname().nodename if hasattr(os, "uname") else "",
+        username=environ.get("USER") or environ.get("LOGNAME") or "",
         cpu=_cpu_model(),
         memory_gb=memory,
     )
