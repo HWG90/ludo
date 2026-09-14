@@ -7,6 +7,7 @@ Ludo does not install packages for you and does not run `sudo`. It explains the 
 ```
 ludo                 # terminal UI
 ludo checkup         # dxdiag, but friendly
+ludo ask "what is Proton"
 ludo translate dir   # Windows command → Linux
 ludo glossary "task manager"
 ```
@@ -17,6 +18,7 @@ You already know how to use a PC. You have a Steam library. You are tired of bei
 
 ## What you get
 
+- **Ask bar** — type a question at the bottom (`/` to focus). Uses a local Qwen model via Ollama if present, otherwise Gemini if `GEMINI_API_KEY` is set, otherwise Ludo’s own notes.
 - **First week path** — eight short guides from "you already know this computer" through Steam and GPU drivers
 - **Windows → Linux glossary** — Super key, AppData, Recycle Bin, DirectX, the works
 - **Command Rosetta stone** — `ipconfig`, `dir`, `taskkill`, `robocopy`…
@@ -53,17 +55,41 @@ uv run ludo
 | `4` / `p` | Gaming |
 | `5` / `c` | Checkup |
 | `6` / `t` | Command translator |
+| `/` | Focus the ask bar |
 | `n` | Continue the first-week path |
 | `?` | Remind me |
 | `q` | Quit |
 
 Inside a guide: `Esc` back, `c` mark complete.
 
+## Chat models
+
+The ask bar always searches Ludo’s guides, glossary, commands, and this PC’s checkup. If a model is available, that material is the prompt — the model does not get a free-roam web.
+
+**Local Qwen (default when Ollama is running):**
+
+```bash
+# lightweight, ~1 GB. Bigger is LUDO_OLLAMA_MODEL=qwen2.5:7b
+ollama pull qwen2.5:1.5b
+ludo llm
+ludo ask "why is Ctrl+C different in the terminal"
+```
+
+**Gemini** (cloud, small/fast Flash-Lite):
+
+```bash
+export GEMINI_API_KEY=...
+ludo ask --llm gemini "will my Steam games work"
+```
+
+Auto order: Ollama if it answers on `localhost:11434`, else Gemini if a key is set, else notes only. Override with `LUDO_LLM=ollama|gemini|off` or `ludo ask --llm`.
+
 ## Project layout
 
 ```
 src/ludo/
-  probe.py            system detection
+  ask.py              question routing (notes + optional model)
+  llm.py              Ollama Qwen and Gemini backends
   recommend.py        per-machine next steps
   content/guides/     the lessons
   content/glossary.py Windows ↔ Linux dictionary

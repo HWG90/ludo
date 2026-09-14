@@ -25,6 +25,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     trans = sub.add_parser("translate", help="Translate a Windows command to Linux")
     trans.add_argument("command", nargs="+", help="e.g. ipconfig, dir, taskkill")
 
+    ask = sub.add_parser("ask", help="Ask a Windows-to-Linux question")
+    ask.add_argument("question", nargs="+", help="e.g. what is Proton, ipconfig, is Steam installed")
+    ask.add_argument(
+        "--llm",
+        choices=["auto", "ollama", "qwen", "gemini", "off"],
+        default=None,
+        help="Qwen via Ollama, Gemini, or notes only (default: auto)",
+    )
+
+    sub.add_parser("llm", help="Show which chat model Ludo would use")
+
     sub.add_parser("guides", help="List built-in guides")
     sub.add_parser("tui", help="Open the interactive terminal UI (default)")
 
@@ -41,6 +52,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_glossary(args.query)
     if args.cmd == "translate":
         return _cmd_translate(" ".join(args.command))
+    if args.cmd == "ask":
+        return _cmd_ask(" ".join(args.question), llm=args.llm)
+    if args.cmd == "llm":
+        return _cmd_llm()
     if args.cmd == "guides":
         return _cmd_guides()
     parser.print_help()
@@ -116,6 +131,45 @@ def _cmd_translate(query: str) -> int:
     for entry in hits:
         body = f"[bold #e6c36a]{entry.linux}[/]\n\n{entry.note}"
         console.print(Panel(body, title=f"Windows: {entry.windows}", border_style="#c9a227"))
+    return 0
+
+
+def _cmd_ask(question: str, llm: str | None = None) -> int:
+    from rich.console import Console
+    from rich.panel import Panel
+
+    from ludo.ask import answer_question
+    from ludo.llm import describe_backend, detect_backend
+    from ludo.probe import probe
+
+    console = Console()
+    try:
+        brain = detect_backend(llm)
+    except RuntimeError as exc:
+        console.print(f"[red]{exc}[/red]")
+        return 1
+    answer = answer_question(question, probe(), llm_choice=llm, backend=brain)
+    console = Console()
+    subtitle = f"{answer.title or answer.source} · {describe_backend(brain)}"
+    console.print(Panel(answer.text, title="Ludo", subtitle=subtitle, border_style="#c9a227"))
+    return 0
+
+
+def _cmd_llm() -> int:
+    from rich.console import Console
+
+    from ludo.llm import DEFAULT_QWEN, describe_backend, detect_backend
+
+    console = Console()
+    try:
+        brain = detect_backend()
+    except RuntimeError as exc:
+        console.print(f"[red]{exc}[/red]")
+        return 1
+    console.print(f"[bold #e6c36a]Brain:[/] {describe_backend(brain)}")
+    if brain is None:
+        console.print(f"Local Qwen: install Ollama, then [bold]ollama pull {DEFAULT_QWEN}[/bold]")
+        console.print("Gemini: export [bold]GEMINI_API_KEY[/bold] and run [bold]ludo ask --llm gemini …[/bold]")
     return 0
 
 

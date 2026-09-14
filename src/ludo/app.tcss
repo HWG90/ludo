@@ -52,14 +52,49 @@ Button.nav.-active {
     text-style: bold;
 }
 
+#main {
+    width: 1fr;
+    height: 1fr;
+}
+
 #body {
     width: 1fr;
     height: 1fr;
     padding: 1 2;
 }
 
-HomeView, WeekView, GlossaryView, GamingView, CheckupView, CommandsView {
+HomeView, WeekView, GlossaryView, GamingView, CheckupView, CommandsView, ChatView {
     height: 1fr;
+}
+
+#ask-bar {
+    height: 3;
+    width: 100%;
+    background: #1c1916;
+    border-top: tall #c9a227;
+    padding: 0 1;
+    align: left middle;
+}
+
+#ask-label {
+    width: 6;
+    color: #c9a227;
+    text-style: bold;
+    content-align: center middle;
+}
+
+#ask-input {
+    width: 1fr;
+    background: #12110e;
+    border: tall #3a3226;
+}
+
+#chat-log {
+    height: 1fr;
+    margin-top: 1;
+    background: #1c1916;
+    border: round #3a3226;
+    padding: 1 2;
 }
 
 #glossary-results, #cmd-results, #week-list {

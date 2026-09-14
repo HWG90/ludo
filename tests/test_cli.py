@@ -36,3 +36,13 @@ def test_checkup_json(capsys) -> None:
 
 def test_pick_steam_for_arch() -> None:
     assert "pacman" in pick(STEAM, make_profile())
+
+
+def test_ask_cli(capsys) -> None:
+    assert main(["ask", "ipconfig"]) == 0
+    assert "ip addr" in capsys.readouterr().out
+
+
+def test_llm_status_cli(capsys) -> None:
+    assert main(["llm"]) == 0
+    assert "Brain:" in capsys.readouterr().out

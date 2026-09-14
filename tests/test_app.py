@@ -25,5 +25,14 @@ def test_app_navigation() -> None:
             await pilot.press("n")
             await pilot.pause()
             assert len(app.screen_stack) == 2
+            await pilot.press("escape")
+            await pilot.pause()
+            ask = app.query_one("#ask-input")
+            ask.value = "what is Proton"
+            await ask.action_submit()
+            await pilot.pause()
+            assert app.current_view == "ask"
+            assert app.chat[0].text == "what is Proton"
+            assert "Proton" in app.chat[1].text or "proton" in app.chat[1].text.lower()
 
     asyncio.run(scenario())

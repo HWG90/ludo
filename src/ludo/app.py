@@ -3,11 +3,15 @@ from __future__ import annotations
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Button, Footer, Header, Static
+from textual.widgets import Button, Footer, Header, Input, Static
+from textual.worker import Worker, WorkerState
 
+from ludo.ask import Answer, answer_question
 from ludo.content.catalog import next_incomplete
+from ludo.llm import Brain, detect_backend
 from ludo.probe import SystemProfile, probe
 from ludo.progress import Progress, load_progress
+from ludo.ui.chat import AskBar, ChatTurn, ChatView
 from ludo.ui.checkup import CheckupView
 from ludo.ui.commands import CommandsView
 from ludo.ui.gaming import GamingView
@@ -23,6 +27,7 @@ NAV = (
     ("gaming", "Gaming"),
     ("checkup", "Checkup"),
     ("commands", "Commands"),
+    ("ask", "Ask"),
 )
 
 VIEWS = {
@@ -32,6 +37,7 @@ VIEWS = {
     "gaming": GamingView,
     "checkup": CheckupView,
     "commands": CommandsView,
+    "ask": ChatView,
 }
 
 
@@ -53,6 +59,7 @@ class LudoApp(App):
         Binding("p", "goto('gaming')", "Gaming", show=False),
         Binding("c", "goto('checkup')", "Checkup", show=False),
         Binding("t", "goto('commands')", "Translate", show=False),
+        Binding("slash", "focus_ask", "Ask"),
         Binding("question_mark", "keys", "Keys"),
         Binding("n", "continue_path", "Continue", show=False),
     ]
@@ -62,24 +69,99 @@ class LudoApp(App):
         self.profile = profile if profile is not None else probe()
         self.progress = progress if progress is not None else load_progress()
         self.current_view = "home"
+        self.chat: list[ChatTurn] = []
+        self.brain: Brain | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Horizontal():
+        with Horizontal(id="main"):
             with Vertical(id="sidebar"):
                 yield Static("LUDO", id="brand")
                 yield Static("find your way", id="brand-sub")
                 for name, label in NAV:
                     yield Button(label, id=f"nav-{name}", classes="nav")
             yield Vertical(id="body")
+        yield AskBar()
         yield Footer()
 
     def on_mount(self) -> None:
+        try:
+            self.brain = detect_backend()
+        except RuntimeError as exc:
+            self.brain = None
+            self.notify(str(exc), severity="warning", timeout=8)
         self.switch_view("home")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id and event.button.id.startswith("nav-"):
             self.switch_view(event.button.id.removeprefix("nav-"))
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id != "ask-input":
+            return
+        query = event.value.strip()
+        if not query:
+            return
+        event.input.value = ""
+        self.ask(query)
+
+    def ask(self, query: str) -> None:
+        if len(self.screen_stack) > 1:
+            return
+        self.chat.append(ChatTurn("you", query))
+        if self.brain is None:
+            answer = answer_question(query, self.profile, use_llm=False)
+            self.chat.append(ChatTurn("ludo", answer.text, answer.guide_id))
+            self.switch_view("ask")
+            self.call_after_refresh(self._focus_ask)
+            return
+        self.chat.append(ChatTurn("ludo", "Thinking…"))
+        self.switch_view("ask")
+        self.call_after_refresh(self._focus_ask)
+        history = [(turn.role, turn.text) for turn in self.chat[:-2]]
+        self.run_worker(
+            lambda: answer_question(query, self.profile, backend=self.brain, history=history),
+            name="ask",
+            group="ask",
+            thread=True,
+            exclusive=True,
+        )
+
+    def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        if event.worker.name != "ask":
+            return
+        if event.state is WorkerState.SUCCESS:
+            answer = event.worker.result
+            if isinstance(answer, Answer):
+                self._finish_ask(answer)
+            return
+        if event.state is WorkerState.ERROR:
+            self._finish_ask(
+                Answer(
+                    "The model did not answer. Ludo notes are still in the guides if you want the offline version.",
+                    source="error",
+                )
+            )
+
+    def _finish_ask(self, answer: Answer) -> None:
+        if self.chat and self.chat[-1].role == "ludo":
+            self.chat[-1] = ChatTurn("ludo", answer.text, answer.guide_id)
+        else:
+            self.chat.append(ChatTurn("ludo", answer.text, answer.guide_id))
+        if self.current_view == "ask":
+            try:
+                self.query_one(ChatView).refresh_log()
+            except Exception:
+                self.switch_view("ask")
+        self.call_after_refresh(self._focus_ask)
+
+    def _focus_ask(self) -> None:
+        self.query_one("#ask-input", Input).focus()
+
+    def action_focus_ask(self) -> None:
+        if len(self.screen_stack) > 1:
+            return
+        self._focus_ask()
 
     def switch_view(self, name: str) -> None:
         if name not in VIEWS:
@@ -114,7 +196,7 @@ class LudoApp(App):
 
     def action_keys(self) -> None:
         self.notify(
-            "1 home · 2 first week · 3 glossary · 4 gaming · 5 checkup · 6 commands · n continue · q quit",
+            "1 home · 2 week · 3 glossary · 4 gaming · 5 checkup · 6 commands · / ask · n continue · q quit",
             timeout=6,
         )
 
