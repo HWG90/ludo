@@ -88,7 +88,7 @@ Inside a guide: `Esc` back, `c` mark complete.
 
 The ask bar always searches Ludo’s guides, glossary, commands, and this PC’s checkup. If a model is available, that material is the prompt — the model does not get a free-roam web.
 
-On first launch Ludo **asks** before touching Ollama: install it for your user (no sudo), download `qwen2.5:7b`, and start it so Ask is ready. Choose **Not now** or **Don’t ask again** anytime. After you say yes, later launches start the model in the background.
+On first launch Ludo **asks** before touching Ollama: install it for your user (no sudo), download `qwen2.5:7b` if you have no model yet, and start it so Ask is ready. If you already pulled Gemma, Llama, or anything else, Ludo lists those and you can switch with **Ctrl+O** (or `ludo llm --model gemma3:27b`). Choose **Not now** or **Don’t ask again** anytime.
 
 ```bash
 # ~5 GB. Smaller/weaker: LUDO_OLLAMA_MODEL=qwen2.5:1.5b

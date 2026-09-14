@@ -196,7 +196,7 @@ Button.ghost {
     padding: 1 2;
 }
 
-SetupScreen, OllamaSetupScreen, UpdateScreen {
+SetupScreen, OllamaSetupScreen, UpdateScreen, ModelScreen {
     align: center middle;
     background: $background 60%;
 }
@@ -213,4 +213,12 @@ SetupScreen, OllamaSetupScreen, UpdateScreen {
 #setup-status {
     margin-top: 1;
     min-height: 1;
+}
+
+#model-list {
+    height: auto;
+    max-height: 16;
+    margin: 1 0 0 0;
+    background: $surface;
+    border: none;
 }

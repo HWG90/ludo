@@ -13,15 +13,21 @@ DEFAULT_THEME = "ludo"
 class Settings:
     theme: str = DEFAULT_THEME
     skip_update: str = ""
+    ollama_model: str = ""
 
     def dump(self) -> dict:
-        return {"theme": self.theme, "skip_update": self.skip_update}
+        return {
+            "theme": self.theme,
+            "skip_update": self.skip_update,
+            "ollama_model": self.ollama_model,
+        }
 
     @classmethod
     def from_dict(cls, data: dict) -> Settings:
         theme = str(data.get("theme") or DEFAULT_THEME).strip() or DEFAULT_THEME
         skip_update = str(data.get("skip_update") or "").strip()
-        return cls(theme=theme, skip_update=skip_update)
+        ollama_model = str(data.get("ollama_model") or "").strip()
+        return cls(theme=theme, skip_update=skip_update, ollama_model=ollama_model)
 
 
 def load_settings(path: Path | None = None) -> Settings:

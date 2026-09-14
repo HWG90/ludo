@@ -79,6 +79,9 @@ class ChatView(Vertical):
             log.mount(Static(" "))
         log.scroll_end(animate=False)
 
+    def refresh_blurb(self) -> None:
+        self.query_one("#ask-blurb", Static).update(self._blurb())
+
     def on_button_pressed(self, event: GuideButton.Pressed) -> None:
         if isinstance(event.button, GuideButton):
             self.app.open_guide(event.button.guide_id)

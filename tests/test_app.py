@@ -167,6 +167,30 @@ def test_theme_change_is_saved() -> None:
     assert load_settings().theme == "nord"
 
 
+def test_model_picker_lists_gemma() -> None:
+    from ludo.ui.models import ModelScreen
+
+    async def scenario() -> None:
+        app = LudoApp(profile=make_profile(), progress=Progress())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            app.push_screen(
+                ModelScreen(
+                    [
+                        ("gemma3:27b", 17_000_000_000),
+                        ("qwen2.5:1.5b", 1_000_000_000),
+                    ]
+                )
+            )
+            await pilot.pause()
+            listing = app.screen.query_one("#model-list")
+            prompts = " ".join(str(option.prompt) for option in listing.options)
+            assert "gemma3:27b" in prompts
+            assert "qwen2.5:1.5b" in prompts
+
+    asyncio.run(scenario())
+
+
 def test_unknown_saved_theme_falls_back_to_ludo() -> None:
     from ludo.settings import Settings, save_settings
 

@@ -10,7 +10,7 @@ from typing import Protocol
 
 DEFAULT_QWEN = "qwen2.5:7b"
 DEFAULT_GEMINI = "gemini-3.1-flash-lite"
-OLLAMA_TIMEOUT = 60
+OLLAMA_TIMEOUT = 90
 GEMINI_TIMEOUT = 20
 PROBE_TIMEOUT = 0.4
 TINY_BILLION_PARAMS = 3.0
@@ -167,16 +167,83 @@ def ollama_is_running(timeout: float = PROBE_TIMEOUT) -> bool:
 
 
 def ollama_model_names() -> list[str]:
+    return [name for name, _size in list_local_model_info()]
+
+
+def list_local_model_info() -> list[tuple[str, int]]:
     try:
-        data = _get_json(f"{_ollama_host()}/api/tags", timeout=PROBE_TIMEOUT)
+        data = _get_json(f"{_ollama_host()}/api/tags", timeout=1.5)
     except (OSError, TimeoutError, urllib.error.URLError, json.JSONDecodeError, ValueError):
-        return []
-    names: list[str] = []
-    for item in data.get("models") or []:
-        name = str(item.get("name") or item.get("model") or "")
-        if name:
-            names.append(name)
-    return names
+        data = None
+    rows: list[tuple[str, int]] = []
+    if isinstance(data, dict):
+        for item in data.get("models") or []:
+            name = str(item.get("name") or item.get("model") or "")
+            if not name:
+                continue
+            try:
+                size = int(item.get("size") or 0)
+            except (TypeError, ValueError):
+                size = 0
+            rows.append((name, size))
+    if rows:
+        return _unique_model_info(rows)
+    from ludo.ollama_setup import list_models_on_disk
+
+    return [(name, 0) for name in list_models_on_disk()]
+
+
+def resolve_ollama_model(installed: list[str] | None = None) -> str:
+    env = (os.environ.get("LUDO_OLLAMA_MODEL") or "").strip()
+    if env:
+        return env
+    from ludo.settings import load_settings
+
+    saved = load_settings().ollama_model.strip()
+    names = list(installed) if installed is not None else ollama_model_names()
+    if saved:
+        return saved
+    picked = pick_installed_model(names)
+    return picked or DEFAULT_QWEN
+
+
+def pick_installed_model(names: list[str]) -> str:
+    if not names:
+        return ""
+    for name in names:
+        if name.lower() == DEFAULT_QWEN.lower() or name.lower().startswith(DEFAULT_QWEN.lower()):
+            return name
+    usable = [name for name in names if not model_is_tiny(name)] or list(names)
+    return max(usable, key=_model_rank)
+
+
+def model_param_billions(model: str) -> float | None:
+    match = re.search(r"(\d+(?:\.\d+)?)\s*b\b", model.lower())
+    if match is None:
+        return None
+    return float(match.group(1))
+
+
+def model_is_tiny(model: str) -> bool:
+    size = model_param_billions(model)
+    if size is None:
+        return True
+    return size <= TINY_BILLION_PARAMS
+
+
+def _model_rank(name: str) -> tuple[float, str]:
+    return (model_param_billions(name) or 0.0, name.lower())
+
+
+def _unique_model_info(rows: list[tuple[str, int]]) -> list[tuple[str, int]]:
+    seen: dict[str, int] = {}
+    for name, size in rows:
+        key = name.lower()
+        if key not in seen or size > seen[key]:
+            seen[key] = size
+    by_lower = {name.lower(): name for name, _size in rows}
+    ordered = sorted(by_lower, key=str)
+    return [(by_lower[key], seen[key]) for key in ordered]
 
 
 def _ollama() -> OllamaBrain:
@@ -212,7 +279,7 @@ def _ollama_host() -> str:
 
 
 def _ollama_model() -> str:
-    return os.environ.get("LUDO_OLLAMA_MODEL") or DEFAULT_QWEN
+    return resolve_ollama_model()
 
 
 def _gemini_model() -> str:
@@ -221,13 +288,6 @@ def _gemini_model() -> str:
 
 def _gemini_key() -> str:
     return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
-
-
-def model_is_tiny(model: str) -> bool:
-    match = re.search(r"(\d+(?:\.\d+)?)\s*b\b", model.lower())
-    if match is None:
-        return True
-    return float(match.group(1)) <= TINY_BILLION_PARAMS
 
 
 def tidy_reply(text: str) -> str:

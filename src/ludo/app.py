@@ -78,6 +78,7 @@ class LudoApp(App):
         Binding("c", "goto('checkup')", "Checkup", show=False),
         Binding("t", "goto('commands')", "Translate", show=False),
         Binding("slash", "focus_ask", "Ask"),
+        Binding("ctrl+o", "pick_model", "Model"),
         Binding("question_mark", "keys", "Keys"),
         Binding("n", "continue_path", "Continue", show=False),
     ]
@@ -169,7 +170,7 @@ class LudoApp(App):
                 self.brain = detect_backend()
             except RuntimeError:
                 self.brain = None
-            self.notify("Qwen is ready. Press / and ask something.", timeout=6)
+            self.notify("Ask is ready. Press / to ask, Ctrl+O to pick a model.", timeout=6)
         self._start_update_check()
 
     def _start_update_check(self) -> None:
@@ -253,7 +254,8 @@ class LudoApp(App):
                     self.brain = detect_backend()
                 except RuntimeError:
                     self.brain = None
-                self.notify("Qwen is loaded. Press / to ask.", timeout=5)
+                self.notify("Ask is ready. Press / to ask, Ctrl+O to pick a model.", timeout=5)
+                self._refresh_ask_blurb()
             elif event.state is WorkerState.ERROR:
                 detail = str(event.worker.error) if event.worker.error else "Ollama did not start"
                 self.notify(detail, severity="warning", timeout=8)
@@ -326,9 +328,68 @@ class LudoApp(App):
 
     def action_keys(self) -> None:
         self.notify(
-            "1 home · 2 week · 3 glossary · 4 gaming · 5 checkup · 6 commands · / ask · n continue · q quit",
+            "1 home · 2 week · 3 glossary · 4 gaming · 5 checkup · 6 commands · / ask · Ctrl+O model · n continue · q quit",
             timeout=6,
         )
+
+    def action_pick_model(self) -> None:
+        if len(self.screen_stack) > 1:
+            return
+        from ludo.llm import list_local_model_info
+        from ludo.ui.models import ModelScreen
+
+        models = list_local_model_info()
+        if not models:
+            self.notify(
+                "No Ollama models on this PC yet. Install Ollama, then ollama pull gemma3:27b (or qwen2.5:7b).",
+                timeout=8,
+            )
+            return
+        self.push_screen(ModelScreen(models), self._after_model_pick)
+
+    def _after_model_pick(self, name: str | None) -> None:
+        if not name:
+            return
+        import os
+
+        if (os.environ.get("LUDO_OLLAMA_MODEL") or "").strip():
+            self.notify(
+                "LUDO_OLLAMA_MODEL is set, so it wins until you unset it.",
+                severity="warning",
+                timeout=8,
+            )
+            return
+        self.settings.ollama_model = name
+        save_settings(self.settings)
+        try:
+            self.brain = detect_backend()
+        except RuntimeError as exc:
+            self.brain = None
+            self.notify(str(exc), severity="warning", timeout=8)
+            return
+        self._refresh_ask_blurb()
+        self.notify(f"Ask will use {name}.", timeout=5)
+        self.run_worker(
+            lambda: _warmup_model(name),
+            thread=True,
+            exclusive=True,
+            group="ollama",
+            name="model-warmup",
+        )
+
+    def _refresh_ask_blurb(self) -> None:
+        if self.current_view != "ask":
+            return
+        try:
+            self.query_one(ChatView).refresh_blurb()
+        except Exception:
+            pass
+
+
+def _warmup_model(name: str) -> None:
+    from ludo.ollama_setup import warmup
+
+    warmup(name)
 
 
 def run() -> None:

@@ -46,3 +46,12 @@ def test_ask_cli(capsys) -> None:
 def test_llm_status_cli(capsys) -> None:
     assert main(["llm"]) == 0
     assert "Brain:" in capsys.readouterr().out
+
+
+def test_llm_model_flag(capsys) -> None:
+    from ludo.settings import load_settings
+
+    assert main(["llm", "--model", "gemma3:27b"]) == 0
+    out = capsys.readouterr().out
+    assert "gemma3:27b" in out
+    assert load_settings().ollama_model == "gemma3:27b"

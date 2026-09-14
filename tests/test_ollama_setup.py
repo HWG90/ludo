@@ -2,6 +2,8 @@ from pathlib import Path
 
 from ludo.ollama_setup import (
     OllamaStatus,
+    have_install_and_model,
+    list_models_on_disk,
     llm_setup_disabled,
     model_on_disk,
     prompt_copy,
@@ -62,6 +64,7 @@ def test_prompt_lists_install_pull_and_start() -> None:
     assert "qwen2.5:7b" in copy
     assert "Start the Ollama service" in copy
     assert "Yes, set it up" in copy
+    assert "Ctrl+O" in copy
 
 
 def test_llm_off_skips_setup() -> None:
@@ -135,3 +138,30 @@ def test_model_on_disk_reads_ollama_manifests(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("OLLAMA_MODELS", str(models))
     assert model_on_disk("qwen2.5:1.5b")
     assert not model_on_disk("llama3:8b")
+
+
+def test_lists_gemma_and_qwen_on_disk(monkeypatch, tmp_path) -> None:
+    models = tmp_path / "models"
+    for rel in (
+        "manifests/registry.ollama.ai/library/qwen2.5/1.5b",
+        "manifests/registry.ollama.ai/library/gemma3/27b",
+    ):
+        path = models / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}")
+    monkeypatch.setenv("OLLAMA_MODELS", str(models))
+    names = list_models_on_disk()
+    assert "gemma3:27b" in names
+    assert "qwen2.5:1.5b" in names
+
+
+def test_existing_other_model_skips_qwen_prompt() -> None:
+    status = OllamaStatus(
+        binary=Path("/usr/bin/ollama"),
+        running=True,
+        model_present=False,
+        model="qwen2.5:7b",
+        installed=("gemma3:27b",),
+    )
+    assert have_install_and_model(status)
+    assert not should_prompt(Progress(), status)

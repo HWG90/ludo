@@ -23,6 +23,7 @@ from ludo.llm import (
     ollama_is_running,
     ollama_model,
     ollama_model_names,
+    resolve_ollama_model,
 )
 from ludo.paths import xdg_data_home
 from ludo.progress import Progress
@@ -39,6 +40,7 @@ class OllamaStatus:
     running: bool
     model_present: bool
     model: str
+    installed: tuple[str, ...] = ()
 
     @property
     def ready(self) -> bool:
@@ -46,10 +48,11 @@ class OllamaStatus:
 
 
 def inspect_ollama() -> OllamaStatus:
-    model = ollama_model()
     running = ollama_is_running()
-    if running:
-        present = _has_model(model, ollama_model_names())
+    installed = tuple(ollama_model_names() if running else list_models_on_disk())
+    model = resolve_ollama_model(list(installed))
+    if installed:
+        present = _has_model(model, list(installed))
     else:
         present = model_on_disk(model)
     return OllamaStatus(
@@ -57,6 +60,7 @@ def inspect_ollama() -> OllamaStatus:
         running=running,
         model_present=present,
         model=model,
+        installed=installed,
     )
 
 
@@ -88,7 +92,7 @@ def llm_setup_disabled() -> bool:
 
 
 def have_install_and_model(status: OllamaStatus) -> bool:
-    return bool(status.binary) and status.model_present
+    return bool(status.binary) and (status.model_present or bool(status.installed))
 
 
 def should_prompt(progress: Progress, status: OllamaStatus) -> bool:
@@ -114,7 +118,7 @@ def should_autostart(progress: Progress, status: OllamaStatus) -> bool:
 def prompt_copy(status: OllamaStatus) -> str:
     model = status.model or DEFAULT_QWEN
     lines = [
-        "Ludo can answer from Qwen 2.5 7B on this PC — no cloud.",
+        "Ludo can answer from a local Ollama model on this PC — no cloud.",
         "",
     ]
     steps: list[str] = []
@@ -122,12 +126,18 @@ def prompt_copy(status: OllamaStatus) -> str:
         steps.append("1. Install Ollama for your user (no sudo, about 50 MB)")
     if not status.running:
         steps.append(f"{len(steps) + 1}. Start the Ollama service")
-    if not status.model_present:
+    if status.installed:
+        listed = ", ".join(status.installed[:4])
+        extra = "…" if len(status.installed) > 4 else ""
+        steps.append(f"{len(steps) + 1}. Use a model already on disk ({listed}{extra})")
+    elif not status.model_present:
         steps.append(f"{len(steps) + 1}. Download {model} (about 5 GB, one time)")
     steps.append(f"{len(steps) + 1}. Load the model now so Ask works immediately")
     lines.extend(steps)
     lines.extend(
         [
+            "",
+            "Later: Ctrl+O to switch models (Gemma, Llama, Qwen… whatever Ollama has).",
             "",
             "Y  Yes, set it up",
             "N  Not now — keep using built-in notes",
@@ -150,19 +160,34 @@ def ollama_models_dir() -> Path:
 
 
 def model_on_disk(model: str) -> bool:
-    name, _, tag = model.partition(":")
-    tag = tag or "latest"
+    return _has_model(model, list_models_on_disk())
+
+
+def list_models_on_disk() -> list[str]:
     manifests = ollama_models_dir() / "manifests"
     if not manifests.is_dir():
-        return False
-    wanted_name = name.lower()
-    wanted_tag = tag.lower()
+        return []
+    found: list[str] = []
     for path in manifests.rglob("*"):
         if not path.is_file():
             continue
-        if path.name.lower() == wanted_tag and path.parent.name.lower() == wanted_name:
-            return True
-    return False
+        rel = path.relative_to(manifests)
+        parts = rel.parts
+        if len(parts) < 2:
+            continue
+        tag = parts[-1]
+        if tag.startswith("."):
+            continue
+        if parts[0] == "registry.ollama.ai" and len(parts) >= 4:
+            namespace, name = parts[1], parts[2]
+            tag = parts[-1]
+            if namespace == "library":
+                found.append(f"{name}:{tag}")
+            else:
+                found.append(f"{namespace}/{name}:{tag}")
+            continue
+        found.append(f"{parts[-2]}:{tag}")
+    return sorted(set(found), key=str.lower)
 
 
 def download_url() -> str:
@@ -182,12 +207,16 @@ def ensure_ready(status: OllamaStatus | None = None, on_progress: ProgressFn | N
         report("Starting Ollama…")
         start_daemon(binary)
         _wait_until_running(timeout=20)
-    if not _has_model(current.model, ollama_model_names()):
-        report(f"Downloading {current.model}… this is the slow one, once.")
-        pull_model(current.model, on_progress=report)
-    report(f"Loading {current.model}…")
-    warmup(current.model)
-    report("Qwen is ready.")
+    names = ollama_model_names()
+    wanted = resolve_ollama_model(names)
+    if not _has_model(wanted, names):
+        report(f"Downloading {wanted}… this is the slow one, once.")
+        pull_model(wanted, on_progress=report)
+        names = ollama_model_names()
+        wanted = resolve_ollama_model(names) if names else wanted
+    report(f"Loading {wanted}…")
+    warmup(wanted)
+    report(f"{wanted} is ready.")
     return inspect_ollama()
 
 

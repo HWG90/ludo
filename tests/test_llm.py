@@ -121,6 +121,30 @@ def test_model_is_tiny() -> None:
     assert "too small for Ask" in describe_backend(tiny)
 
 
+def test_pick_installed_prefers_large_models() -> None:
+    from ludo.llm import pick_installed_model
+
+    assert pick_installed_model(["qwen2.5:1.5b", "gemma3:27b"]) == "gemma3:27b"
+    assert pick_installed_model(["qwen2.5:7b", "gemma3:27b"]) == "qwen2.5:7b"
+    assert pick_installed_model([]) == ""
+
+
+def test_resolve_saved_model(monkeypatch) -> None:
+    from ludo.llm import resolve_ollama_model
+    from ludo.settings import Settings, save_settings
+
+    monkeypatch.delenv("LUDO_OLLAMA_MODEL", raising=False)
+    save_settings(Settings(ollama_model="gemma3:27b"))
+    assert resolve_ollama_model(["gemma3:27b", "qwen2.5:7b"]) == "gemma3:27b"
+
+
+def test_resolve_env_overrides_saved(monkeypatch) -> None:
+    from ludo.llm import resolve_ollama_model
+
+    monkeypatch.setenv("LUDO_OLLAMA_MODEL", "llama3:8b")
+    assert resolve_ollama_model(["gemma3:27b"]) == "llama3:8b"
+
+
 def test_gemini_complete(monkeypatch) -> None:
     def fake_post(url: str, payload: dict, timeout: float) -> dict:
         assert "generateContent" in url

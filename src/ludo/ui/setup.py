@@ -26,7 +26,7 @@ class OllamaSetupScreen(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="setup-card"):
-            yield Label("Set up local Qwen?", classes="gold")
+            yield Label("Set up a local model?", classes="gold")
             yield Static(prompt_copy(self.status), id="setup-copy")
             with Horizontal(id="setup-actions"):
                 yield Button("Yes, set it up", id="setup-yes", classes="primary")

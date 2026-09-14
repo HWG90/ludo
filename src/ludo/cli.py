@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections.abc import Sequence
 
@@ -34,7 +35,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Qwen via Ollama, Gemini, or notes only (default: auto)",
     )
 
-    sub.add_parser("llm", help="Show which chat model Ludo would use")
+    llm = sub.add_parser("llm", help="Show which chat model Ludo would use")
+    llm.add_argument("--model", default="", help="Save an Ollama model name (e.g. gemma3:27b)")
 
     sub.add_parser("guides", help="List built-in guides")
     sub.add_parser("tui", help="Open the interactive terminal UI (default)")
@@ -57,7 +59,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.cmd == "ask":
         return _cmd_ask(" ".join(args.question), llm=args.llm)
     if args.cmd == "llm":
-        return _cmd_llm()
+        return _cmd_llm(model=getattr(args, "model", "") or "")
     if args.cmd == "guides":
         return _cmd_guides()
     if args.cmd == "update":
@@ -159,20 +161,35 @@ def _cmd_ask(question: str, llm: str | None = None) -> int:
     return 0
 
 
-def _cmd_llm() -> int:
+def _cmd_llm(model: str = "") -> int:
     from rich.console import Console
 
-    from ludo.llm import DEFAULT_QWEN, describe_backend, detect_backend
+    from ludo.llm import DEFAULT_QWEN, describe_backend, detect_backend, list_local_model_info, ollama_model
+    from ludo.settings import load_settings, save_settings
 
     console = Console()
+    chosen = model.strip()
+    if chosen:
+        settings = load_settings()
+        settings.ollama_model = chosen
+        save_settings(settings)
+        console.print(f"[bold #e6c36a]Saved Ollama model:[/] {chosen}")
+        if (os.environ.get("LUDO_OLLAMA_MODEL") or "").strip():
+            console.print("[yellow]LUDO_OLLAMA_MODEL is set and still overrides this.[/yellow]")
     try:
         brain = detect_backend()
     except RuntimeError as exc:
         console.print(f"[red]{exc}[/red]")
         return 1
     console.print(f"[bold #e6c36a]Brain:[/] {describe_backend(brain)}")
-    if brain is None:
-        console.print(f"Local Qwen: install Ollama, then [bold]ollama pull {DEFAULT_QWEN}[/bold]")
+    console.print(f"[dim]Active Ollama name:[/] {ollama_model()}")
+    installed = list_local_model_info()
+    if installed:
+        listing = ", ".join(name for name, _size in installed)
+        console.print(f"[dim]Installed:[/] {listing}")
+        console.print("In the TUI, [bold]Ctrl+O[/bold] switches among these.")
+    elif brain is None:
+        console.print(f"Local model: install Ollama, then [bold]ollama pull {DEFAULT_QWEN}[/bold]")
         console.print("Gemini: export [bold]GEMINI_API_KEY[/bold] and run [bold]ludo ask --llm gemini …[/bold]")
     return 0
 
