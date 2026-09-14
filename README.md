@@ -53,7 +53,7 @@ uv tool install git+https://github.com/HWG90/ludo.git
 ludo
 ```
 
-**From a clone** (hacking on it):
+**From a clone**:
 
 ```bash
 python -m venv .venv
