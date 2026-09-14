@@ -13,6 +13,7 @@ from ludo.llm import Brain, detect_backend
 from ludo.ollama_setup import inspect_ollama, should_autostart, should_prompt, stop_ludo_ollama
 from ludo.probe import SystemProfile, probe
 from ludo.progress import Progress, load_progress, save_progress
+from ludo.settings import DEFAULT_THEME, Settings, load_settings, save_settings
 from ludo.ui.chat import AskBar, ChatTurn, ChatView
 from ludo.ui.checkup import CheckupView
 from ludo.ui.commands import CommandsView
@@ -81,11 +82,18 @@ class LudoApp(App):
         Binding("n", "continue_path", "Continue", show=False),
     ]
 
-    def __init__(self, profile: SystemProfile | None = None, progress: Progress | None = None) -> None:
+    def __init__(
+        self,
+        profile: SystemProfile | None = None,
+        progress: Progress | None = None,
+        settings: Settings | None = None,
+    ) -> None:
         super().__init__()
         self.register_theme(LUDO_THEME)
         self.profile = profile if profile is not None else probe()
         self.progress = progress if progress is not None else load_progress()
+        self.settings = settings if settings is not None else load_settings()
+        self._persist_theme = True
         self.current_view = "home"
         self.chat: list[ChatTurn] = []
         self.brain: Brain | None = None
@@ -103,8 +111,7 @@ class LudoApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        if self.theme == "textual-dark":
-            self.theme = "ludo"
+        self._apply_saved_theme()
         try:
             self.brain = detect_backend()
         except RuntimeError as exc:
@@ -115,6 +122,20 @@ class LudoApp(App):
 
     def on_unmount(self) -> None:
         stop_ludo_ollama()
+
+    def _apply_saved_theme(self) -> None:
+        wanted = self.settings.theme or DEFAULT_THEME
+        if wanted not in self.available_themes:
+            wanted = DEFAULT_THEME
+        self.theme = wanted
+
+    def watch_theme(self, theme_name: str) -> None:
+        if not getattr(self, "_persist_theme", False):
+            return
+        if self.settings.theme == theme_name:
+            return
+        self.settings.theme = theme_name
+        save_settings(self.settings)
 
     def _boot_ollama(self) -> None:
         status = inspect_ollama()

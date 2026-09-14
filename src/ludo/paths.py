@@ -16,6 +16,10 @@ def progress_path() -> Path:
     return xdg_data_home() / "ludo" / "progress.json"
 
 
+def settings_path() -> Path:
+    return xdg_data_home() / "ludo" / "settings.json"
+
+
 def package_root() -> Path:
     return Path(__file__).resolve().parent
 

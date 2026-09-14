@@ -25,7 +25,7 @@ You already know how to use a PC. You have a Steam library. You are tired of bei
 - **Checkup** — distro, desktop, GPU, Vulkan, Steam, Proton, MangoHud, GameMode
 - **Gaming track** — Proton, ProtonDB, Heroic/Lutris, anti-cheat honesty, dual-boot NTFS traps
 
-Progress is saved locally in `~/.local/share/ludo/progress.json`.
+Progress is saved in `~/.local/share/ludo/progress.json`. Preferences such as the last theme live in `settings.json` next to it.
 
 ## Install
 

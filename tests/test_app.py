@@ -106,3 +106,45 @@ def test_no_ollama_setup_when_already_installed(monkeypatch) -> None:
             assert not isinstance(app.screen, OllamaSetupScreen)
 
     asyncio.run(scenario())
+
+
+def test_saved_theme_is_restored() -> None:
+    from ludo.settings import Settings, save_settings
+
+    save_settings(Settings(theme="textual-light"))
+
+    async def scenario() -> None:
+        app = LudoApp(profile=make_profile(), progress=Progress())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert app.theme == "textual-light"
+
+    asyncio.run(scenario())
+
+
+def test_theme_change_is_saved() -> None:
+    from ludo.settings import load_settings
+
+    async def scenario() -> None:
+        app = LudoApp(profile=make_profile(), progress=Progress())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            app.theme = "nord"
+            await pilot.pause()
+
+    asyncio.run(scenario())
+    assert load_settings().theme == "nord"
+
+
+def test_unknown_saved_theme_falls_back_to_ludo() -> None:
+    from ludo.settings import Settings, save_settings
+
+    save_settings(Settings(theme="not-a-real-theme"))
+
+    async def scenario() -> None:
+        app = LudoApp(profile=make_profile(), progress=Progress())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert app.theme == "ludo"
+
+    asyncio.run(scenario())
