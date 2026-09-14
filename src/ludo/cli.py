@@ -38,6 +38,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     sub.add_parser("guides", help="List built-in guides")
     sub.add_parser("tui", help="Open the interactive terminal UI (default)")
+    upd = sub.add_parser("update", help="Compare this copy to GitHub and install if newer")
+    upd.add_argument("--check", action="store_true", help="Only print versions, do not install")
 
     args = parser.parse_args(list(argv) if argv is not None else None)
 
@@ -58,6 +60,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_llm()
     if args.cmd == "guides":
         return _cmd_guides()
+    if args.cmd == "update":
+        return _cmd_update(check_only=args.check)
     parser.print_help()
     return 1
 
@@ -188,6 +192,36 @@ def _cmd_guides() -> int:
     for guide in GUIDES:
         table.add_row(guide.id, guide.title, SECTIONS.get(guide.section, guide.section), str(guide.minutes))
     console.print(table)
+    return 0
+
+
+def _cmd_update(*, check_only: bool) -> int:
+    from rich.console import Console
+
+    import urllib.error
+
+    from ludo.update import apply_update, fetch_remote_version, is_newer
+
+    console = Console()
+    try:
+        remote = fetch_remote_version()
+    except (OSError, TimeoutError, ValueError, urllib.error.URLError) as exc:
+        console.print(f"[red]Could not reach GitHub:[/red] {exc}")
+        return 1
+    console.print(f"[bold #e6c36a]This copy:[/] {__version__}")
+    console.print(f"[bold #e6c36a]GitHub:[/]    {remote}")
+    if not is_newer(remote, __version__):
+        console.print("Already up to date.")
+        return 0
+    if check_only:
+        console.print("Update available. Run [bold]ludo update[/bold].")
+        return 0
+    try:
+        apply_update(on_progress=lambda msg: console.print(msg))
+    except RuntimeError as exc:
+        console.print(f"[red]{exc}[/red]")
+        return 1
+    console.print(f"Updated toward [bold]{remote}[/bold]. Run [bold]ludo[/bold] again.")
     return 0
 
 

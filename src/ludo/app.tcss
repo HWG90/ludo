@@ -196,7 +196,7 @@ Button.ghost {
     padding: 1 2;
 }
 
-SetupScreen, OllamaSetupScreen {
+SetupScreen, OllamaSetupScreen, UpdateScreen {
     align: center middle;
     background: $background 60%;
 }

@@ -146,6 +146,7 @@ class LudoApp(App):
             return
         if should_autostart(self.progress, status):
             self.run_worker(self._autostart_ollama, thread=True, exclusive=True, name="ollama-boot")
+        self._start_update_check()
 
     def _autostart_ollama(self) -> None:
         from ludo.ollama_setup import ensure_ready
@@ -157,14 +158,42 @@ class LudoApp(App):
             self.progress.ollama_choice = "declined"
             save_progress(self.progress)
             self.notify("Ask will use built-in notes. You can still set GEMINI_API_KEY later.")
-            return
-        if result == "accepted":
+        elif result == "accepted":
             try:
                 self.brain = detect_backend()
             except RuntimeError:
                 self.brain = None
             self.notify("Qwen is ready. Press / and ask something.", timeout=6)
+        self._start_update_check()
+
+    def _start_update_check(self) -> None:
+        from ludo.update import updates_disabled
+
+        if updates_disabled():
             return
+        self.run_worker(self._check_for_update, thread=True, exclusive=True, name="update-check")
+
+    def _check_for_update(self):
+        from ludo.update import check_for_update
+
+        return check_for_update(self.settings)
+
+    def _maybe_offer_update(self, info) -> None:
+        if info is None:
+            return
+        if len(self.screen_stack) > 1:
+            self.set_timer(0.8, lambda: self._maybe_offer_update(info))
+            return
+        from ludo.ui.update import UpdateScreen
+
+        self.push_screen(UpdateScreen(info), self._after_update)
+
+    def _after_update(self, result: str | None) -> None:
+        if result == "updated":
+            self.notify("Updated. Quit and run ludo again to start the new copy.", timeout=8)
+            return
+        if result == "declined":
+            self.notify("Okay — Ludo will stay on this version until a newer one lands.")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id and event.button.id.startswith("nav-"):
@@ -202,6 +231,10 @@ class LudoApp(App):
         )
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        if event.worker.name == "update-check":
+            if event.state is WorkerState.SUCCESS:
+                self._maybe_offer_update(event.worker.result)
+            return
         if event.worker.name == "ollama-boot":
             if event.state is WorkerState.SUCCESS:
                 try:

@@ -12,14 +12,16 @@ DEFAULT_THEME = "ludo"
 @dataclass
 class Settings:
     theme: str = DEFAULT_THEME
+    skip_update: str = ""
 
     def dump(self) -> dict:
-        return {"theme": self.theme}
+        return {"theme": self.theme, "skip_update": self.skip_update}
 
     @classmethod
     def from_dict(cls, data: dict) -> Settings:
         theme = str(data.get("theme") or DEFAULT_THEME).strip() or DEFAULT_THEME
-        return cls(theme=theme)
+        skip_update = str(data.get("skip_update") or "").strip()
+        return cls(theme=theme, skip_update=skip_update)
 
 
 def load_settings(path: Path | None = None) -> Settings:

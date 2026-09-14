@@ -169,3 +169,24 @@ def test_chat_scrolls_to_latest() -> None:
             assert log.scroll_offset.y == log.max_scroll_y
 
     asyncio.run(scenario())
+
+
+def test_update_prompt_when_github_is_newer(monkeypatch) -> None:
+    from ludo.ui.update import UpdateScreen
+    from ludo.update import UpdateInfo
+
+    monkeypatch.setenv("LUDO_UPDATE", "auto")
+    info = UpdateInfo(local="0.1.0", remote="9.9.9", repo="HWG90/ludo")
+    monkeypatch.setattr("ludo.update.check_for_update", lambda settings: info)
+
+    async def scenario() -> None:
+        app = LudoApp(profile=make_profile(), progress=Progress())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.pause()
+            assert isinstance(app.screen, UpdateScreen)
+            await pilot.press("n")
+            await pilot.pause()
+            assert not isinstance(app.screen, UpdateScreen)
+
+    asyncio.run(scenario())

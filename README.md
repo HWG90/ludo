@@ -10,6 +10,7 @@ ludo checkup         # dxdiag, but friendly
 ludo ask "what is Proton"
 ludo translate dir   # Windows command → Linux
 ludo glossary "task manager"
+ludo update          # pull a newer copy from GitHub
 ```
 
 ## Who it is for
@@ -63,6 +64,8 @@ ludo
 ```
 
 Arch / CachyOS: a starting PKGBUILD is in `packaging/arch/`. PyPI (`pipx install ludo-linux`) is the next publish step once a release is uploaded.
+
+Launch compares this copy to GitHub (`pyproject.toml` on `master`, or the latest release tag). If GitHub is newer, Ludo asks before updating. `ludo update --check` only prints the two versions. `LUDO_UPDATE=off` skips the check.
 
 ## Keyboard (in the UI)
 
