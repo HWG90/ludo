@@ -224,7 +224,7 @@ GUIDES: tuple[Guide, ...] = (
             QuizQuestion(
                 prompt="Before buying a competitive online game for Linux, what should you check?",
                 choices=(
-                    "Whether the box art includes a penguin",
+                    "Whether the store page has a cute mascot",
                     "ProtonDB plus whether the anti-cheat supports Linux/Proton",
                     "If the game has a .exe, because that guarantees it will run",
                 ),

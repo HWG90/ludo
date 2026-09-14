@@ -11,7 +11,7 @@ from typing import Protocol
 DEFAULT_QWEN = "qwen2.5:7b"
 DEFAULT_GEMINI = "gemini-3.1-flash-lite"
 OLLAMA_TIMEOUT = 90
-GEMINI_TIMEOUT = 20
+GEMINI_TIMEOUT = 60
 PROBE_TIMEOUT = 0.4
 TINY_BILLION_PARAMS = 3.0
 _LINE_STOP = frozenset(
@@ -21,29 +21,30 @@ _LINE_STOP = frozenset(
     """.split()
 )
 
-SYSTEM = """You are Ludo, a calm Linux guide for people coming from Windows — especially gamers using Steam and Proton.
+SYSTEM = """You are Ludo, a clear, practical assistant for people moving from Windows to Linux on their own PC.
 
-Stay grounded:
-- Answer the user's question first.
-- This PC facts are the source of truth for hostname, user, distro, GPU, and Steam on this machine. Quote those values.
-- Use the notes for Windows-to-Linux habits. Do not recap a whole guide.
-- If the notes are thin or say you do not know, say that in one or two sentences.
-- Never invent commands, flags, or package names. Never pretend you ran something.
-- Do not tell anyone to disable security features.
+Talk like a knowledgeable enthusiast helping a friend, not a marketer and not a gamer-bro. Steam and games are fine when asked about; they are not the whole story.
 
-Keep it short:
-- A few sentences, or at most five unique bullets.
-- Never repeat a bullet or rephrase the same fact.
-- If the user is joking, saying thanks, or saying "lol", reply with one short sentence — no lists.
-- Stop as soon as the question is answered. No markdown tables."""
+Do:
+- Answer the actual question in your own words.
+- Use the computer facts when the question is about this machine.
+- Treat the handbook snippet as optional background, not a script to recite.
+- Be honest when you are unsure. Prefer official docs (Arch Wiki, distro docs, man pages) over guessing.
+- Never pretend you ran a command on the user's PC. Never tell anyone to disable security features.
+
+Don't:
+- Recite a glossary entry or dump a Windows→Linux Rosetta stone unless they asked for that.
+- Pad with repeated bullets or unrelated hostname/user trivia.
+- Use slang like “gg”, “skill issue”, “the penguin”, or similar.
+
+Length: as long as the question needs — usually a short paragraph or a few bullets. No markdown tables."""
 
 _OLLAMA_OPTIONS = {
-    "temperature": 0.1,
+    "temperature": 0.65,
     "top_p": 0.9,
-    "repeat_penalty": 1.35,
+    "repeat_penalty": 1.15,
     "repeat_last_n": 128,
-    "num_predict": 140,
-    "stop": ["\nYou\n", "\nYou:", "\nQuestion:"],
+    "num_predict": 768,
 }
 
 
@@ -65,7 +66,10 @@ class OllamaBrain:
         return f"Ollama {self.model}"
 
     def complete(self, question: str, context: str, history: list[tuple[str, str]]) -> str:
-        messages = [{"role": "system", "content": SYSTEM + "\n\nNotes:\n" + context}]
+        system = SYSTEM
+        if context.strip():
+            system = SYSTEM + "\n\n" + context
+        messages = [{"role": "system", "content": system}]
         for role, text in _usable_history(history):
             messages.append({"role": "user" if role == "you" else "assistant", "content": text})
         messages.append({"role": "user", "content": question})
@@ -75,7 +79,7 @@ class OllamaBrain:
             "stream": False,
             "options": dict(_OLLAMA_OPTIONS),
         }
-        data = _post_json(f"{self.host}/api/chat", payload, timeout=OLLAMA_TIMEOUT)
+        data = _post_json(f"{self.host}/api/chat", payload, timeout=_ollama_timeout(self.model))
         error = data.get("error")
         if error:
             raise RuntimeError(str(error))
@@ -102,11 +106,14 @@ class GeminiBrain:
                     "parts": [{"text": text}],
                 }
             )
-        contents.append({"role": "user", "parts": [{"text": f"Notes:\n{context}\n\nQuestion: {question}"}]})
+        contents.append({"role": "user", "parts": [{"text": question}]})
+        system = SYSTEM
+        if context.strip():
+            system = SYSTEM + "\n\n" + context
         payload = {
-            "system_instruction": {"parts": [{"text": SYSTEM}]},
+            "system_instruction": {"parts": [{"text": system}]},
             "contents": contents,
-            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 220},
+            "generationConfig": {"temperature": 0.65, "maxOutputTokens": 1024},
         }
         url = (
             "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -227,7 +234,7 @@ def model_param_billions(model: str) -> float | None:
 def model_is_tiny(model: str) -> bool:
     size = model_param_billions(model)
     if size is None:
-        return True
+        return False
     return size <= TINY_BILLION_PARAMS
 
 
@@ -306,7 +313,7 @@ def tidy_reply(text: str) -> str:
         seen.append(norm)
         kept.append(stripped)
         nonempty += 1
-        if nonempty >= 6:
+        if nonempty >= 48:
             break
     while kept and kept[-1] == "":
         kept.pop()
@@ -344,7 +351,12 @@ def _usable_history(history: list[tuple[str, str]]) -> list[tuple[str, str]]:
         if role != "you" and looks_like_loop(stripped):
             continue
         usable.append((role, stripped))
-    return usable[-4:]
+    return usable[-12:]
+
+
+def _ollama_timeout(model: str) -> float:
+    size = model_param_billions(model) or 7.0
+    return min(300.0, max(float(OLLAMA_TIMEOUT), size * 8.0))
 
 
 def _finalize_reply(text: str) -> str:
@@ -352,8 +364,6 @@ def _finalize_reply(text: str) -> str:
     cleaned = tidy_reply(raw)
     if not cleaned:
         raise RuntimeError("empty reply")
-    if looks_like_loop(raw, cleaned):
-        raise RuntimeError("repetitive reply")
     return cleaned
 
 

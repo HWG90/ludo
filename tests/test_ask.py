@@ -39,7 +39,7 @@ def test_unknown_is_honest() -> None:
     assert answer.source == "miss"
 
 
-def test_chitchat_skips_brain() -> None:
+def test_chitchat_reaches_capable_brain() -> None:
     class TrackingBrain:
         name = "fake"
         label = "fake"
@@ -47,12 +47,56 @@ def test_chitchat_skips_brain() -> None:
 
         def complete(self, question: str, context: str, history: list[tuple[str, str]]) -> str:
             TrackingBrain.called = True
-            return "should not run"
+            return "Ha — what do you want to know?"
 
     TrackingBrain.called = False
     answer = answer_question("lol", backend=TrackingBrain())
+    assert TrackingBrain.called
+    assert answer.source == "fake"
+    assert "Ha" in answer.text
+
+
+def test_chitchat_tiny_stays_on_notes() -> None:
+    from ludo.llm import OllamaBrain
+
+    called: list[str] = []
+
+    class QuietOllama(OllamaBrain):
+        def complete(self, question: str, context: str, history: list[tuple[str, str]]) -> str:
+            called.append(question)
+            return "should not run"
+
+    brain = QuietOllama(host="http://127.0.0.1:11434", model="qwen2.5:1.5b")
+    answer = answer_question("lol", backend=brain)
     assert answer.source == "chat"
-    assert not TrackingBrain.called
+    assert called == []
+
+
+def test_capable_model_answers_instead_of_glossary() -> None:
+    captured: dict[str, str] = {}
+
+    class ChatBrain:
+        name = "ollama"
+        label = "Ollama gemma3:27b"
+        model = "gemma3:27b"
+
+        def complete(self, question: str, context: str, history: list[tuple[str, str]]) -> str:
+            captured["question"] = question
+            captured["context"] = context
+            return "Start with the Arch Wiki: https://wiki.archlinux.org"
+
+    answer = answer_question(
+        "Where can I get the most up to date info on arch",
+        make_profile(),
+        backend=ChatBrain(),
+    )
+    assert answer.source == "ollama"
+    assert "wiki.archlinux.org" in answer.text
+    assert ".exe" not in answer.text.lower()
+    assert captured["question"].lower().startswith("where can i get")
+    assert ".exe" not in captured["context"].lower()
+    assert "microsoft store" not in captured["context"].lower()
+    assert "testbox" in captured["context"]
 
 
 def test_ludo_commands_use_notes() -> None:

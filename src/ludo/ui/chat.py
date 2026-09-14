@@ -23,7 +23,7 @@ class AskBar(Horizontal):
     def compose(self) -> ComposeResult:
         yield Label("Ask", id="ask-label")
         yield Input(
-            placeholder="Ask about Steam, copy-paste, ipconfig, this GPU…  Enter to send",
+            placeholder="Ask about Linux, this PC, or a Windows habit…  Enter to send",
             id="ask-input",
         )
 
@@ -41,17 +41,17 @@ class ChatView(Vertical):
         label = describe_backend(brain)
         if brain is None:
             return (
-                "Answering from Ludo’s built-in notes. For a local Qwen model: ollama pull qwen2.5:7b. "
-                "For Gemini, set GEMINI_API_KEY."
+                "Answering from Ludo’s built-in notes. For live chat, install Ollama and pick a model with Ctrl+O. "
+                "Or set GEMINI_API_KEY."
             )
         if getattr(brain, "name", "") == "gemini":
-            return f"Using {label}. Replies are grounded in Ludo’s notes, then sent to Google."
+            return f"Using {label}. Live chat via Google. Ctrl+O is only for local Ollama models."
         if uses_notes_only(brain):
             return (
-                f"{label}. {getattr(brain, 'model', 'This model')} invents too much for chat, "
-                "so Ask uses Ludo’s notes. For live answers: LUDO_OLLAMA_MODEL=qwen2.5:7b."
+                f"{label}. This size of model is too small for chat, so Ask uses Ludo’s notes. "
+                "Pick a larger installed model with Ctrl+O."
             )
-        return f"Using {label} on this machine. Nothing is sent to the cloud."
+        return f"Using {label} on this machine. Live chat — nothing is sent to the cloud. Ctrl+O to switch."
 
     def on_mount(self) -> None:
         log = self.query_one("#chat-log", VerticalScroll)
@@ -65,7 +65,7 @@ class ChatView(Vertical):
         if not history:
             log.mount(
                 Static(
-                    "Try “what is Proton”, “Task Manager”, “ipconfig”, or “is Steam installed”.",
+                    "Try “how do I update”, “Task Manager”, “ipconfig”, or “what is my hostname”.",
                     classes="muted",
                 )
             )

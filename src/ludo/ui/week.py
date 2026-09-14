@@ -12,7 +12,7 @@ class WeekView(Vertical):
         completed = self.app.progress.completed
         yield Label("First week on Linux", classes="gold")
         yield Static(
-            "Eight short stops. Skip around. The order is how most Windows gamers actually get comfortable.",
+            "Eight short stops. Skip around. The order is how most people coming from Windows get comfortable.",
             classes="muted",
         )
         yield ListView(*self._items(completed), id="week-list")

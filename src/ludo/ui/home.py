@@ -19,7 +19,7 @@ class HomeView(VerticalScroll):
         yield Label("Ludo", classes="gold hero")
         yield Static(
             "A quiet guide for Windows users who want Linux as a daily driver — "
-            "and their Steam library to come with them.",
+            "same machine, different layout.",
             classes="muted",
         )
         with Vertical(classes="card"):

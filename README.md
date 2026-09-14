@@ -1,13 +1,13 @@
 # Ludo
 
-Interactive terminal guide for people moving from Windows to Linux — especially if the plan is **Steam, Proton, and a daily driver**, not a weekend experiment.
+Interactive terminal guide for people moving from Windows to Linux as a daily driver — same machine, new layout.
 
 Ludo does not install packages for you and does not run `sudo`. It explains the new nouns, translates the old habits, and looks at *this* machine so the next step is specific.
 
 ```
 ludo                 # terminal UI
 ludo checkup         # dxdiag, but friendly
-ludo ask "what is Proton"
+ludo ask "how do I update"
 ludo translate dir   # Windows command → Linux
 ludo glossary "task manager"
 ludo update          # pull a newer copy from GitHub
@@ -15,15 +15,15 @@ ludo update          # pull a newer copy from GitHub
 
 ## Who it is for
 
-You already know how to use a PC. You have a Steam library. You are tired of being told to "just use the terminal" without anyone mapping it onto File Explorer, Task Manager, and Setup.exe.
+You already know how to use a PC. You are tired of being told to "just use the terminal" without anyone mapping it onto File Explorer, Task Manager, and Setup.exe.
 
 ## What you get
 
-- **Ask bar** — type a question at the bottom (`/` to focus). On first launch Ludo prompts to install Ollama, fetch Qwen 2.5 7B, and start it. Gemini is the cloud fallback if you set `GEMINI_API_KEY`.
-- **First week path** — eight short guides from "you already know this computer" through Steam and GPU drivers
+- **Ask bar** — live chat with a local Ollama model (or Gemini if you set a key). Tiny models and no-model mode fall back to Ludo’s notes.
+- **First week path** — eight short guides from "you already know this computer" through desktop, updates, GPU, and Steam
 - **Windows → Linux glossary** — Super key, AppData, Recycle Bin, DirectX, the works
 - **Command Rosetta stone** — `ipconfig`, `dir`, `taskkill`, `robocopy`…
-- **Checkup** — distro, desktop, GPU, Vulkan, Steam, Proton, MangoHud, GameMode
+- **Checkup** — distro, desktop, GPU, Vulkan, and whatever this PC already has installed
 - **Gaming track** — Proton, ProtonDB, Heroic/Lutris, anti-cheat honesty, dual-boot NTFS traps
 
 Progress is saved in `~/.local/share/ludo/progress.json`. Preferences such as the last theme live in `settings.json` next to it.
@@ -86,7 +86,7 @@ Inside a guide: `Esc` back, `c` mark complete.
 
 ## Chat models
 
-The ask bar always searches Ludo’s guides, glossary, commands, and this PC’s checkup. If a model is available, that material is the prompt — the model does not get a free-roam web.
+Ask is a normal chat with the model you pick. Capable local models (7B and up, including Gemma 27B) answer the question you typed. They get a short fact sheet about this PC so “what is my hostname” is accurate; they do not get the glossary as a script. Models around 3B or smaller stay on Ludo’s built-in notes.
 
 On first launch Ludo **asks** before touching Ollama: install it for your user (no sudo), download `qwen2.5:7b` if you have no model yet, and start it so Ask is ready. If you already pulled Gemma, Llama, or anything else, Ludo lists those and you can switch with **Ctrl+O** (or `ludo llm --model gemma3:27b`). Choose **Not now** or **Don’t ask again** anytime.
 

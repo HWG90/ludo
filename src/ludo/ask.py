@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from ludo.content.catalog import GUIDES, Guide, get_guide, load_guide_text
+from ludo.content.catalog import GUIDES, Guide
 from ludo.content.commands import COMMANDS, CommandMap, translate_command
 from ludo.content.glossary import GlossaryEntry, search_glossary
 from ludo.content.installs import APPS, STEAM, AppInstall, pick
@@ -119,26 +119,32 @@ def answer_question(
     history: list[tuple[str, str]] | None = None,
     llm_choice: str | None = None,
 ) -> Answer:
-    if _is_chitchat(query):
-        return _chitchat_answer()
-    notes = answer_from_notes(query, profile)
-    if not use_llm:
-        return notes
     brain: Brain | None
     if backend is ...:
-        brain = detect_backend(llm_choice)
+        brain = detect_backend(llm_choice) if use_llm else None
     else:
         brain = backend  # type: ignore[assignment]
-    if brain is None or uses_notes_only(brain):
-        return notes
-    try:
-        text = brain.complete(query, _context_pack(query, profile, notes), history or [])
-    except Exception:
-        return notes
-    cleaned = (text or "").strip()
-    if not cleaned:
-        return notes
-    return Answer(cleaned, source=brain.name, guide_id=notes.guide_id, title=notes.title)
+        if not use_llm:
+            brain = None
+    if brain is not None and not uses_notes_only(brain):
+        try:
+            text = brain.complete(query, _chat_context(profile), history or [])
+        except Exception as exc:
+            detail = str(exc).strip() or exc.__class__.__name__
+            return Answer(
+                f"The model did not answer ({detail}). Try again, or pick another model with Ctrl+O.",
+                source="error",
+            )
+        cleaned = (text or "").strip()
+        if not cleaned:
+            return Answer(
+                "The model returned an empty reply. Try again, or pick another model with Ctrl+O.",
+                source="error",
+            )
+        return Answer(cleaned, source=brain.name)
+    if _is_chitchat(query):
+        return _chitchat_answer()
+    return answer_from_notes(query, profile)
 
 
 def answer_from_notes(query: str, profile: SystemProfile | None = None) -> Answer:
@@ -183,19 +189,11 @@ def answer_from_notes(query: str, profile: SystemProfile | None = None) -> Answe
     return winner[1]
 
 
-def _context_pack(query: str, profile: SystemProfile | None, notes: Answer) -> str:
-    chunks = [f"Question: {query}"]
-    if profile is not None:
-        facts = "\n".join(f"{key}: {value}" for key, value in profile_facts(profile)[:10])
-        chunks.append("This PC (use these values when the question is about this computer):\n" + facts)
-    chunks.append(f"Best local note ({notes.source}):\n{notes.text}")
-    if notes.guide_id:
-        try:
-            body = load_guide_text(get_guide(notes.guide_id)).strip()
-            chunks.append("Guide excerpt (only if the question is about this topic):\n" + body[:900])
-        except OSError:
-            pass
-    return "\n\n".join(chunks)[:4000]
+def _chat_context(profile: SystemProfile | None) -> str:
+    if profile is None:
+        return ""
+    facts = "\n".join(f"{key}: {value}" for key, value in profile_facts(profile)[:10])
+    return "Facts about this computer (use when the question is about this PC):\n" + facts
 
 
 def _tokens(query: str) -> tuple[str, ...]:
@@ -205,9 +203,9 @@ def _tokens(query: str) -> tuple[str, ...]:
 
 def _help() -> Answer:
     return Answer(
-        "Ask a Windows habit, a command, or something about this PC. "
-        "Try “what is Proton”, “ipconfig”, “Task Manager”, or “is Steam installed”. "
-        "I answer from Ludo’s guides — I do not run sudo for you.",
+        "Ask about Linux, this PC, or a Windows habit you want to map over. "
+        "Try “Task Manager”, “ipconfig”, “how do I update”, or “what is my hostname”. "
+        "I will not run sudo for you.",
         source="help",
         title="Ask Ludo",
     )
@@ -215,9 +213,9 @@ def _help() -> Answer:
 
 def _fallback(query: str) -> Answer:
     return Answer(
-        f"I do not have a sharp answer for “{query}” yet. "
+        f"I do not have a sharp built-in note for “{query}” yet. "
         "Try a Windows name (Task Manager, AppData), a command (dir, ipconfig), "
-        "or a topic (Steam, Proton, NVIDIA, dual-boot).",
+        "or a topic (updates, NVIDIA, dual-boot, this GPU).",
         source="miss",
     )
 
@@ -383,7 +381,7 @@ def _is_chitchat(query: str) -> bool:
 
 def _chitchat_answer() -> Answer:
     return Answer(
-        "Ha. Ask a Windows habit, a command, or something about this PC when you want a real answer.",
+        "Sure. Ask about Linux, this PC, or a Windows habit when you want a real answer.",
         source="chat",
         title="Ask Ludo",
     )
@@ -432,7 +430,7 @@ def _ludo_score(tokens: tuple[str, ...], lowered: str) -> int:
 
 def _ludo_answer() -> Answer:
     return Answer(
-        "Ludo is this app — a Linux guide for Windows gamers using Steam and Proton.\n\n"
+        "Ludo is this app — a Linux guide for people coming from Windows.\n\n"
         "Commands for Ludo itself:\n"
         "- `ludo` — open this UI\n"
         "- `ludo checkup` — scan this PC\n"

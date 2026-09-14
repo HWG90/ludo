@@ -15,7 +15,7 @@ class GamingView(VerticalScroll):
         yield Label("Gaming on Linux", classes="gold")
         yield Static(
             "Steam is still Steam. Proton is the compatibility layer Valve ships so Windows titles run. "
-            "Check ProtonDB before you blame the penguin.",
+            "Check ProtonDB for a title before you spend an evening troubleshooting.",
             classes="muted",
         )
         with Vertical(classes="card"):

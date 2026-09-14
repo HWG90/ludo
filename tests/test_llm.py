@@ -27,9 +27,10 @@ def test_injected_brain_wins() -> None:
     assert "ip addr" in answer.text
 
 
-def test_brain_failure_falls_back_to_notes() -> None:
+def test_brain_failure_is_an_error() -> None:
     answer = answer_question("ipconfig", make_profile(), backend=BoomBrain())
-    assert answer.source == "command"
+    assert answer.source == "error"
+    assert "offline" in answer.text
 
 
 def test_use_llm_false_skips_brain() -> None:
@@ -67,8 +68,8 @@ def test_ollama_complete(monkeypatch) -> None:
         assert url.endswith("/api/chat")
         assert payload["model"] == "qwen2.5:1.5b"
         options = payload["options"]
-        assert options["repeat_penalty"] >= 1.3
-        assert options["num_predict"] <= 160
+        assert options["repeat_penalty"] >= 1.1
+        assert options["num_predict"] >= 256
         return {"message": {"content": "Use Proton in Steam compatibility."}}
 
     monkeypatch.setattr("ludo.llm._post_json", fake_post)
@@ -77,7 +78,7 @@ def test_ollama_complete(monkeypatch) -> None:
     assert "Proton" in text
 
 
-def test_ollama_rejects_loop(monkeypatch) -> None:
+def test_ollama_tidies_loop(monkeypatch) -> None:
     from ludo.llm import looks_like_loop, tidy_reply
 
     ramble = (
@@ -100,12 +101,9 @@ def test_ollama_rejects_loop(monkeypatch) -> None:
 
     monkeypatch.setattr("ludo.llm._post_json", fake_post)
     brain = OllamaBrain(host="http://127.0.0.1:11434", model="qwen2.5:1.5b")
-    try:
-        brain.complete("commands for ludo", "notes: Ludo has a command map.", [])
-    except RuntimeError as exc:
-        assert "repetitive" in str(exc)
-    else:
-        raise AssertionError("looping reply should be rejected")
+    text = brain.complete("commands for ludo", "notes: Ludo has a command map.", [])
+    assert "pacman" in text
+    assert len(text) < len(ramble)
 
 
 def test_model_is_tiny() -> None:
@@ -114,6 +112,8 @@ def test_model_is_tiny() -> None:
     assert model_is_tiny("qwen2.5:1.5b")
     assert model_is_tiny("qwen2.5:3b")
     assert not model_is_tiny("qwen2.5:7b")
+    assert not model_is_tiny("gemma3:27b")
+    assert not model_is_tiny("llama3:latest")
     tiny = OllamaBrain(host="http://127.0.0.1:11434", model="qwen2.5:1.5b")
     big = OllamaBrain(host="http://127.0.0.1:11434", model="qwen2.5:7b")
     assert uses_notes_only(tiny)
@@ -149,6 +149,8 @@ def test_gemini_complete(monkeypatch) -> None:
     def fake_post(url: str, payload: dict, timeout: float) -> dict:
         assert "generateContent" in url
         assert "test-key" in url
+        assert payload["contents"][-1]["parts"][0]["text"] == "steam"
+        assert "Notes:" not in payload["contents"][-1]["parts"][0]["text"]
         return {"candidates": [{"content": {"parts": [{"text": "Enable Steam Play."}]}}]}
 
     monkeypatch.setattr("ludo.llm._post_json", fake_post)
@@ -162,3 +164,11 @@ def test_http_error_model_missing() -> None:
 
     message = _short_http_error(404, "model 'qwen2.5:1.5b' not found")
     assert "ollama pull" in message
+
+
+def test_large_model_gets_longer_timeout() -> None:
+    from ludo.llm import _ollama_timeout
+
+    assert _ollama_timeout("qwen2.5:7b") >= 90
+    assert _ollama_timeout("gemma3:27b") >= 200
+    assert _ollama_timeout("gemma3:27b") <= 300

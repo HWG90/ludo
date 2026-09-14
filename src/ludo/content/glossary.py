@@ -123,7 +123,7 @@ GLOSSARY: tuple[GlossaryEntry, ...] = (
     GlossaryEntry(
         ".exe / .msi installers",
         "Native packages, Flatpak, AppImage, or Proton/Wine if it truly is a Windows program",
-        "A Windows installer is not a Linux program. Games get Proton. Productivity apps should be native or web.",
+        "A Windows installer is not a Linux program. Prefer a native package, Flatpak, or web app. Wine or Proton is only for software that still has no Linux build.",
         ("software", "gaming"),
     ),
     GlossaryEntry(
@@ -243,13 +243,13 @@ GLOSSARY: tuple[GlossaryEntry, ...] = (
     GlossaryEntry(
         "Disk Management",
         "KDE Partition Manager, GNOME Disks, `lsblk`, `btrfs` tools, GParted",
-        "Look, do not touch, until you have a backup. Resizing the Windows partition is the dual-boot boss fight.",
+        "Do not resize or format until you have a backup. Changing the Windows partition is the riskiest dual-boot step.",
         ("system", "files"),
     ),
     GlossaryEntry(
         "Remote Desktop (mstsc)",
         "GNOME Remote Desktop, KRdp, Sunshine/Moonlight, or `ssh` for terminal work",
-        "SSH is the Linux native remote story. For sitting at the desktop from the couch, Moonlight is what gamers actually use.",
+        "SSH is the usual remote terminal. For a full desktop session, GNOME Remote Desktop, KRdp, or Sunshine/Moonlight are common options.",
         ("system",),
     ),
 )

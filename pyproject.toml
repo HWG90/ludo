@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ludo-linux"
-version = "0.1.8"
-description = "Interactive terminal guide for Windows users moving to Linux — especially gamers."
+version = "0.1.9"
+description = "Interactive terminal guide for Windows users moving to Linux."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"

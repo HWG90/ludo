@@ -28,10 +28,10 @@ Deck verification is a hint, not a guarantee, because Valve's OS is a known targ
 
 ## Practical strategy
 
-Keep a small Windows partition or another PC for the two games that refuse. Daily-drive Linux anyway. This is not surrender; it is how a lot of very online Linux gamers actually live.
+Keep a small Windows partition or another PC for the two titles that refuse. Daily-drive Linux anyway. That is a practical split, not a failure.
 
 Single-player, co-op PvE, and native titles are the abundant case. Let them be the abundant case.
 
 ## If you remember one thing
 
-Anti-cheat is politics and kernel modules, not a Proton skill issue. Look it up per game. Do not take a Twitter screenshot from 2023 as the last word.
+Anti-cheat is publisher policy and kernel modules. A different Proton version will not talk a vendor into supporting Linux. Look it up per game, and do not treat a 2023 screenshot as the last word.

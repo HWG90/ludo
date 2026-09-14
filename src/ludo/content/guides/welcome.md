@@ -1,6 +1,6 @@
 # You already know this computer
 
-Linux is not a personality. It is an operating system sitting on the same SSD, talking to the same GPU, launching the same Steam library you already paid for.
+Linux is not a personality. It is an operating system sitting on the same SSD, talking to the same hardware, running the software you already own.
 
 If you can install a driver, pin a taskbar icon, and survive Device Manager, you have the skills. The names change. The jobs do not.
 
@@ -12,7 +12,7 @@ Three words get mixed together:
 - **Desktop environment** — the panels, launcher, and settings app (KDE Plasma, GNOME, Cinnamon…). This is the part that *feels* like Windows or macOS.
 - **Distribution (distro)** — a product that ships the kernel + desktop + software store + defaults. Ubuntu, Fedora, CachyOS, Mint, SteamOS are distros.
 
-You did not "install Linux" in the abstract. You installed a distro. That is why two Linux PCs can look nothing alike and still run the same game through Proton.
+You did not "install Linux" in the abstract. You installed a distro. That is why two Linux PCs can look nothing alike and still do the same jobs.
 
 ## What actually changes on day one
 

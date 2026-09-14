@@ -12,7 +12,7 @@ from ludo import __version__
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="ludo",
-        description="Interactive Linux guide for people coming from Windows — especially gamers.",
+        description="Interactive Linux guide for people coming from Windows.",
     )
     parser.add_argument("--version", action="version", version=f"ludo {__version__}")
     sub = parser.add_subparsers(dest="cmd")
@@ -27,7 +27,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     trans.add_argument("command", nargs="+", help="e.g. ipconfig, dir, taskkill")
 
     ask = sub.add_parser("ask", help="Ask a Windows-to-Linux question")
-    ask.add_argument("question", nargs="+", help="e.g. what is Proton, ipconfig, is Steam installed")
+    ask.add_argument("question", nargs="+", help="e.g. how do I update, ipconfig, what is my hostname")
     ask.add_argument(
         "--llm",
         choices=["auto", "ollama", "qwen", "gemini", "off"],
