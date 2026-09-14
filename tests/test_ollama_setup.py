@@ -10,18 +10,18 @@ from ludo.ollama_setup import (
 )
 from ludo.progress import Progress
 
-MISSING = OllamaStatus(binary=None, running=False, model_present=False, model="qwen2.5:1.5b")
+MISSING = OllamaStatus(binary=None, running=False, model_present=False, model="qwen2.5:7b")
 INSTALLED = OllamaStatus(
     binary=Path("/usr/bin/ollama"),
     running=False,
     model_present=True,
-    model="qwen2.5:1.5b",
+    model="qwen2.5:7b",
 )
 READY = OllamaStatus(
     binary=Path("/usr/bin/ollama"),
     running=True,
     model_present=True,
-    model="qwen2.5:1.5b",
+    model="qwen2.5:7b",
 )
 
 
@@ -59,7 +59,7 @@ def test_autostart_only_after_yes(monkeypatch) -> None:
 def test_prompt_lists_install_pull_and_start() -> None:
     copy = prompt_copy(MISSING)
     assert "Install Ollama" in copy
-    assert "qwen2.5:1.5b" in copy
+    assert "qwen2.5:7b" in copy
     assert "Start the Ollama service" in copy
     assert "Yes, set it up" in copy
 

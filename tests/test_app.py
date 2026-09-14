@@ -73,7 +73,7 @@ def test_app_stops_ollama_on_exit(monkeypatch) -> None:
 
 def test_ollama_setup_prompt(monkeypatch) -> None:
     monkeypatch.setenv("LUDO_LLM", "auto")
-    missing = OllamaStatus(binary=None, running=False, model_present=False, model="qwen2.5:1.5b")
+    missing = OllamaStatus(binary=None, running=False, model_present=False, model="qwen2.5:7b")
     monkeypatch.setattr("ludo.app.inspect_ollama", lambda: missing)
 
     async def scenario() -> None:
@@ -94,7 +94,7 @@ def test_no_ollama_setup_when_already_installed(monkeypatch) -> None:
         binary=Path("/usr/bin/ollama"),
         running=False,
         model_present=True,
-        model="qwen2.5:1.5b",
+        model="qwen2.5:7b",
     )
     monkeypatch.setattr("ludo.app.inspect_ollama", lambda: installed)
     monkeypatch.setattr("ludo.ollama_setup.ensure_ready", lambda: installed)
@@ -115,7 +115,7 @@ def test_ollama_autostart_survives_update_check(monkeypatch) -> None:
         binary=Path("/usr/bin/ollama"),
         running=False,
         model_present=True,
-        model="qwen2.5:1.5b",
+        model="qwen2.5:7b",
     )
     started: list[str] = []
     monkeypatch.setattr("ludo.app.inspect_ollama", lambda: installed)

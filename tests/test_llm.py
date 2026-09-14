@@ -109,11 +109,16 @@ def test_ollama_rejects_loop(monkeypatch) -> None:
 
 
 def test_model_is_tiny() -> None:
-    from ludo.llm import model_is_tiny
+    from ludo.llm import model_is_tiny, uses_notes_only
 
     assert model_is_tiny("qwen2.5:1.5b")
     assert model_is_tiny("qwen2.5:3b")
     assert not model_is_tiny("qwen2.5:7b")
+    tiny = OllamaBrain(host="http://127.0.0.1:11434", model="qwen2.5:1.5b")
+    big = OllamaBrain(host="http://127.0.0.1:11434", model="qwen2.5:7b")
+    assert uses_notes_only(tiny)
+    assert not uses_notes_only(big)
+    assert "too small for Ask" in describe_backend(tiny)
 
 
 def test_gemini_complete(monkeypatch) -> None:

@@ -118,3 +118,28 @@ def test_tiny_ollama_keeps_hostname_facts() -> None:
     assert answer.source == "machine"
     assert "testbox" in answer.text
     assert called == []
+
+
+def test_discord_install_uses_notes() -> None:
+    answer = answer_question("Where do I get discord for linux", make_profile(), use_llm=False)
+    assert answer.source == "app"
+    assert "discord" in answer.text.lower()
+    assert ".exe" in answer.text.lower()
+    assert "pacman -S discord" in answer.text or "flathub com.discordapp.Discord" in answer.text
+
+
+def test_tiny_qwen_does_not_paraphrase_guides() -> None:
+    from ludo.llm import OllamaBrain
+
+    called: list[str] = []
+
+    class QuietOllama(OllamaBrain):
+        def complete(self, question: str, context: str, history: list[tuple[str, str]]) -> str:
+            called.append(question)
+            return "Download DiscordSetup.exe and use a proxy server."
+
+    brain = QuietOllama(host="http://127.0.0.1:11434", model="qwen2.5:1.5b")
+    answer = answer_question("Where do I get discord", make_profile(), backend=brain)
+    assert answer.source == "app"
+    assert called == []
+    assert "proxy" not in answer.text.lower()

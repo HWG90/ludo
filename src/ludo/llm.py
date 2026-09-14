@@ -8,9 +8,9 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Protocol
 
-DEFAULT_QWEN = "qwen2.5:1.5b"
+DEFAULT_QWEN = "qwen2.5:7b"
 DEFAULT_GEMINI = "gemini-3.1-flash-lite"
-OLLAMA_TIMEOUT = 20
+OLLAMA_TIMEOUT = 60
 GEMINI_TIMEOUT = 20
 PROBE_TIMEOUT = 0.4
 TINY_BILLION_PARAMS = 3.0
@@ -136,8 +136,18 @@ def detect_backend(choice: str | None = None) -> Brain | None:
 
 def describe_backend(brain: Brain | None) -> str:
     if brain is None:
-        return "notes only — ollama pull qwen2.5:1.5b, or set GEMINI_API_KEY"
+        return "notes only — ollama pull qwen2.5:7b, or set GEMINI_API_KEY"
+    if uses_notes_only(brain):
+        return f"{brain.label} — too small for Ask, using notes"
     return brain.label
+
+
+def uses_notes_only(brain: object | None) -> bool:
+    if brain is None:
+        return True
+    if getattr(brain, "name", "") != "ollama":
+        return False
+    return model_is_tiny(str(getattr(brain, "model", "")))
 
 
 def ollama_host() -> str:

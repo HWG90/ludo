@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from ludo.content.catalog import GUIDES, Guide, get_guide, load_guide_text
 from ludo.content.commands import COMMANDS, CommandMap, translate_command
 from ludo.content.glossary import GlossaryEntry, search_glossary
-from ludo.content.installs import STEAM, pick
+from ludo.content.installs import APPS, STEAM, AppInstall, pick
 from ludo.format import profile_facts, steam_label
-from ludo.llm import Brain, detect_backend, model_is_tiny
+from ludo.llm import Brain, detect_backend, uses_notes_only
 from ludo.probe import SystemProfile
 from ludo.recommend import recommend
 
@@ -129,7 +129,7 @@ def answer_question(
         brain = detect_backend(llm_choice)
     else:
         brain = backend  # type: ignore[assignment]
-    if brain is None or _skip_tiny_llm(brain, notes):
+    if brain is None or uses_notes_only(brain):
         return notes
     try:
         text = brain.complete(query, _context_pack(query, profile, notes), history or [])
@@ -156,6 +156,7 @@ def answer_from_notes(query: str, profile: SystemProfile | None = None) -> Answe
     machine_score = _machine_score(tokens, lowered)
     ludo_score = _ludo_score(tokens, lowered)
     commands_score = 0 if command else _commands_overview_score(tokens, lowered)
+    app = _best_app(cleaned, tokens, profile)
 
     ranked: list[tuple[int, Answer]] = []
     if command:
@@ -170,6 +171,8 @@ def answer_from_notes(query: str, profile: SystemProfile | None = None) -> Answe
         ranked.append((ludo_score, _ludo_answer()))
     if commands_score:
         ranked.append((commands_score, _commands_overview()))
+    if app:
+        ranked.append(app)
 
     if not ranked:
         return _fallback(cleaned)
@@ -386,12 +389,33 @@ def _chitchat_answer() -> Answer:
     )
 
 
-def _skip_tiny_llm(brain: object, notes: Answer) -> bool:
-    if getattr(brain, "name", "") != "ollama":
-        return False
-    if not model_is_tiny(str(getattr(brain, "model", ""))):
-        return False
-    return notes.source in {"miss", "help", "commands", "ludo", "chat", "command", "machine"}
+def _best_app(
+    query: str, tokens: tuple[str, ...], profile: SystemProfile | None
+) -> tuple[int, Answer] | None:
+    lowered = query.lower()
+    scored: list[tuple[int, AppInstall]] = []
+    for app in APPS:
+        names = (app.name.lower(), *app.aliases)
+        if not any(name in lowered for name in names):
+            continue
+        score = 72
+        if any(word in lowered for word in ("install", "download", "get", "where")):
+            score += 24
+        scored.append((score, app))
+    if not scored:
+        return None
+    scored.sort(key=lambda item: (item[0], len(item[1].name)), reverse=True)
+    score, app = scored[0]
+    command = pick(app.command, profile) if profile is not None else app.command.get("generic", "")
+    flatpak = app.command.get("generic", "")
+    extra = ""
+    if command and flatpak and command != flatpak and "flatpak" in flatpak:
+        extra = f"\nEverywhere else: `{flatpak}`"
+    text = (
+        f"{app.name} on Linux is a Linux app. Do not run the Windows installer.\n\n"
+        f"On this PC: `{command}`{extra}\n\n{app.note}"
+    )
+    return score, Answer(text, source="app", title=app.name, guide_id=app.guide_id)
 
 
 def _ludo_score(tokens: tuple[str, ...], lowered: str) -> int:

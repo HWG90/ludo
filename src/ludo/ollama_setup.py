@@ -114,7 +114,7 @@ def should_autostart(progress: Progress, status: OllamaStatus) -> bool:
 def prompt_copy(status: OllamaStatus) -> str:
     model = status.model or DEFAULT_QWEN
     lines = [
-        "Ludo can answer from a small Qwen model on this PC — no cloud, no Steam-sized download.",
+        "Ludo can answer from Qwen 2.5 7B on this PC — no cloud.",
         "",
     ]
     steps: list[str] = []
@@ -123,7 +123,7 @@ def prompt_copy(status: OllamaStatus) -> str:
     if not status.running:
         steps.append(f"{len(steps) + 1}. Start the Ollama service")
     if not status.model_present:
-        steps.append(f"{len(steps) + 1}. Download {model} (about 1 GB, one time)")
+        steps.append(f"{len(steps) + 1}. Download {model} (about 5 GB, one time)")
     steps.append(f"{len(steps) + 1}. Load the model now so Ask works immediately")
     lines.extend(steps)
     lines.extend(

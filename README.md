@@ -19,7 +19,7 @@ You already know how to use a PC. You have a Steam library. You are tired of bei
 
 ## What you get
 
-- **Ask bar** — type a question at the bottom (`/` to focus). On first launch Ludo prompts to install Ollama, fetch a small Qwen model, and start it. Gemini is the cloud fallback if you set `GEMINI_API_KEY`.
+- **Ask bar** — type a question at the bottom (`/` to focus). On first launch Ludo prompts to install Ollama, fetch Qwen 2.5 7B, and start it. Gemini is the cloud fallback if you set `GEMINI_API_KEY`.
 - **First week path** — eight short guides from "you already know this computer" through Steam and GPU drivers
 - **Windows → Linux glossary** — Super key, AppData, Recycle Bin, DirectX, the works
 - **Command Rosetta stone** — `ipconfig`, `dir`, `taskkill`, `robocopy`…
@@ -88,11 +88,11 @@ Inside a guide: `Esc` back, `c` mark complete.
 
 The ask bar always searches Ludo’s guides, glossary, commands, and this PC’s checkup. If a model is available, that material is the prompt — the model does not get a free-roam web.
 
-On first launch Ludo **asks** before touching Ollama: install it for your user (no sudo), download `qwen2.5:1.5b`, and start it so Ask is ready. Choose **Not now** or **Don’t ask again** anytime. After you say yes, later launches start the model in the background.
+On first launch Ludo **asks** before touching Ollama: install it for your user (no sudo), download `qwen2.5:7b`, and start it so Ask is ready. Choose **Not now** or **Don’t ask again** anytime. After you say yes, later launches start the model in the background.
 
 ```bash
-# lightweight, ~1 GB. Bigger is LUDO_OLLAMA_MODEL=qwen2.5:7b
-ollama pull qwen2.5:1.5b
+# ~5 GB. Smaller/weaker: LUDO_OLLAMA_MODEL=qwen2.5:1.5b
+ollama pull qwen2.5:7b
 ludo llm
 ludo ask "why is Ctrl+C different in the terminal"
 ```
