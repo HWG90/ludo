@@ -49,7 +49,7 @@ class OllamaSetupScreen(ModalScreen[str]):
         actions = self.query_one("#setup-actions")
         actions.display = False
         self._set_status("Working… you can leave this up.")
-        self.run_worker(self._run_setup, thread=True, exclusive=True, name="ollama-setup")
+        self.run_worker(self._run_setup, thread=True, exclusive=True, group="ollama", name="ollama-setup")
 
     def action_skip(self) -> None:
         if self._busy:

@@ -108,6 +108,37 @@ def test_no_ollama_setup_when_already_installed(monkeypatch) -> None:
     asyncio.run(scenario())
 
 
+def test_ollama_autostart_survives_update_check(monkeypatch) -> None:
+    monkeypatch.setenv("LUDO_LLM", "auto")
+    monkeypatch.setenv("LUDO_UPDATE", "auto")
+    installed = OllamaStatus(
+        binary=Path("/usr/bin/ollama"),
+        running=False,
+        model_present=True,
+        model="qwen2.5:1.5b",
+    )
+    started: list[str] = []
+    monkeypatch.setattr("ludo.app.inspect_ollama", lambda: installed)
+    monkeypatch.setattr(
+        "ludo.ollama_setup.ensure_ready",
+        lambda: started.append("ollama") or installed,
+    )
+    monkeypatch.setattr(
+        "ludo.update.check_for_update",
+        lambda settings: started.append("update") or None,
+    )
+
+    async def scenario() -> None:
+        app = LudoApp(profile=make_profile(), progress=Progress())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.pause()
+            assert "ollama" in started
+            assert "update" in started
+
+    asyncio.run(scenario())
+
+
 def test_saved_theme_is_restored() -> None:
     from ludo.settings import Settings, save_settings
 

@@ -145,7 +145,13 @@ class LudoApp(App):
             self.push_screen(OllamaSetupScreen(status), self._after_ollama_setup)
             return
         if should_autostart(self.progress, status):
-            self.run_worker(self._autostart_ollama, thread=True, exclusive=True, name="ollama-boot")
+            self.run_worker(
+                self._autostart_ollama,
+                thread=True,
+                exclusive=True,
+                group="ollama",
+                name="ollama-boot",
+            )
         self._start_update_check()
 
     def _autostart_ollama(self) -> None:
@@ -171,7 +177,13 @@ class LudoApp(App):
 
         if updates_disabled():
             return
-        self.run_worker(self._check_for_update, thread=True, exclusive=True, name="update-check")
+        self.run_worker(
+            self._check_for_update,
+            thread=True,
+            exclusive=True,
+            group="update",
+            name="update-check",
+        )
 
     def _check_for_update(self):
         from ludo.update import check_for_update

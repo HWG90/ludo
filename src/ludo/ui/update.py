@@ -48,7 +48,7 @@ class UpdateScreen(ModalScreen[str]):
         self._busy = True
         self.query_one("#setup-actions").display = False
         self._set_status("Updating…")
-        self.run_worker(self._run_update, thread=True, exclusive=True, name="ludo-update")
+        self.run_worker(self._run_update, thread=True, exclusive=True, group="update", name="ludo-update")
 
     def action_skip(self) -> None:
         if self._busy:
