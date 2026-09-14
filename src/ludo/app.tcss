@@ -103,6 +103,11 @@ ChatView {
     overflow-y: auto;
 }
 
+#ask-thinking {
+    height: 1;
+    color: $text-primary;
+}
+
 #glossary-results, #cmd-results, #week-list {
     height: 1fr;
     margin-top: 1;

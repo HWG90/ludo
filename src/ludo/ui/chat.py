@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import monotonic
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.timer import Timer
 from textual.widgets import Input, Label, Static
 
 from ludo.ui.widgets import GuideButton
+
+_THINKING_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
 
 
 @dataclass
@@ -14,6 +18,32 @@ class ChatTurn:
     role: str
     text: str
     guide_id: str | None = None
+    thinking: bool = False
+
+
+class ThinkingIndicator(Static):
+    def __init__(self) -> None:
+        super().__init__(id="ask-thinking")
+        self._index = 0
+        self._started = monotonic()
+        self._timer: Timer | None = None
+
+    def on_mount(self) -> None:
+        self._started = monotonic()
+        self._paint()
+        self._timer = self.set_interval(0.1, self._paint)
+
+    def on_unmount(self) -> None:
+        if self._timer is not None:
+            self._timer.stop()
+            self._timer = None
+
+    def _paint(self) -> None:
+        frame = _THINKING_FRAMES[self._index % len(_THINKING_FRAMES)]
+        self._index += 1
+        elapsed = int(monotonic() - self._started)
+        wait = f"  {elapsed}s" if elapsed >= 1 else ""
+        self.update(f"{frame}  Thinking…{wait}")
 
 
 class AskBar(Horizontal):
@@ -73,7 +103,10 @@ class ChatView(Vertical):
         for turn in history:
             who = "You" if turn.role == "you" else "Ludo"
             log.mount(Static(who, classes="gold" if turn.role == "ludo" else "muted"))
-            log.mount(Static(turn.text))
+            if turn.role == "ludo" and turn.thinking:
+                log.mount(ThinkingIndicator())
+            else:
+                log.mount(Static(turn.text))
             if turn.role == "ludo" and turn.guide_id:
                 log.mount(GuideButton(f"Open guide: {turn.guide_id}", turn.guide_id))
             log.mount(Static(" "))

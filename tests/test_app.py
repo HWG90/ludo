@@ -205,6 +205,34 @@ def test_unknown_saved_theme_falls_back_to_ludo() -> None:
     asyncio.run(scenario())
 
 
+def test_thinking_throbber_animates() -> None:
+    from ludo.ask import Answer
+    from ludo.ui.chat import ChatTurn, ThinkingIndicator
+
+    async def scenario() -> None:
+        app = LudoApp(profile=make_profile(), progress=Progress())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            app.chat = [
+                ChatTurn("you", "hello"),
+                ChatTurn("ludo", "Thinking…", thinking=True),
+            ]
+            app.switch_view("ask")
+            await pilot.pause()
+            throbber = app.query_one("#ask-thinking", ThinkingIndicator)
+            start = throbber._index
+            await pilot.pause(0.35)
+            assert throbber._index != start
+            assert "Thinking" in str(throbber.content)
+            app._finish_ask(Answer("here you go", source="fake"))
+            await pilot.pause()
+            assert not app.query("#ask-thinking")
+            assert app.chat[-1].text == "here you go"
+            assert not app.chat[-1].thinking
+
+    asyncio.run(scenario())
+
+
 def test_chat_scrolls_to_latest() -> None:
     from ludo.ui.chat import ChatTurn
 

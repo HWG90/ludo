@@ -218,11 +218,15 @@ class LudoApp(App):
         query = event.value.strip()
         if not query:
             return
+        if self.chat and self.chat[-1].thinking:
+            return
         event.input.value = ""
         self.ask(query)
 
     def ask(self, query: str) -> None:
         if len(self.screen_stack) > 1:
+            return
+        if self.chat and self.chat[-1].thinking:
             return
         self.chat.append(ChatTurn("you", query))
         if self.brain is None:
@@ -231,7 +235,7 @@ class LudoApp(App):
             self.switch_view("ask")
             self.call_after_refresh(self._focus_ask)
             return
-        self.chat.append(ChatTurn("ludo", "Thinking…"))
+        self.chat.append(ChatTurn("ludo", "Thinking…", thinking=True))
         self.switch_view("ask")
         self.call_after_refresh(self._focus_ask)
         history = [(turn.role, turn.text) for turn in self.chat[:-2]]
@@ -276,7 +280,7 @@ class LudoApp(App):
             )
 
     def _finish_ask(self, answer: Answer) -> None:
-        if self.chat and self.chat[-1].role == "ludo":
+        if self.chat and self.chat[-1].role == "ludo" and self.chat[-1].thinking:
             self.chat[-1] = ChatTurn("ludo", answer.text, answer.guide_id)
         else:
             self.chat.append(ChatTurn("ludo", answer.text, answer.guide_id))
