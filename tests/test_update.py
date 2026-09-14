@@ -85,3 +85,42 @@ def test_prompt_copy_mentions_versions() -> None:
     assert "0.2.0" in copy
     assert "0.1.0" in copy
     assert "Yes, update now" in copy
+
+
+def test_install_kind_detects_uv_without_following_python_symlink(monkeypatch) -> None:
+    import sys
+
+    from ludo.update import install_kind
+
+    monkeypatch.setattr(sys, "executable", "/home/me/.local/share/uv/tools/ludo-linux/bin/python")
+    monkeypatch.setattr(sys, "argv", ["ludo"])
+    monkeypatch.setattr("ludo.update.shutil.which", lambda name: None)
+    monkeypatch.setattr("ludo.update.source_repo", lambda: None)
+    assert install_kind() == "uv"
+
+
+def test_install_kind_detects_pipx_from_unresolved_path(monkeypatch) -> None:
+    import sys
+
+    from ludo.update import install_kind
+
+    monkeypatch.setattr(sys, "executable", "/home/me/.local/share/pipx/venvs/ludo-linux/bin/python")
+    monkeypatch.setattr(sys, "argv", ["ludo"])
+    monkeypatch.setattr("ludo.update.shutil.which", lambda name: None)
+    monkeypatch.setattr("ludo.update.source_repo", lambda: None)
+    assert install_kind() == "pipx"
+
+
+def test_install_kind_detects_uv_from_ludo_script(monkeypatch) -> None:
+    import sys
+
+    from ludo.update import install_kind
+
+    monkeypatch.setattr(sys, "executable", "/usr/bin/python3")
+    monkeypatch.setattr(sys, "argv", ["/home/me/.local/bin/ludo"])
+    monkeypatch.setattr(
+        "ludo.update.shutil.which",
+        lambda name: "/home/me/.local/share/uv/tools/ludo-linux/bin/ludo" if name == "ludo" else None,
+    )
+    monkeypatch.setattr("ludo.update.source_repo", lambda: None)
+    assert install_kind() == "uv"

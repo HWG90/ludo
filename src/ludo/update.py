@@ -127,21 +127,49 @@ def check_for_update(settings: Settings, *, local: str | None = None) -> UpdateI
 
 
 def install_kind() -> str:
-    exe = Path(sys.executable).resolve()
-    text = str(exe)
-    if "pipx" in text.split(os.sep):
-        return "pipx"
-    if "/uv/tools/" in text or "\\uv\\tools\\" in text:
-        return "uv"
-    venv = xdg_data_home() / "ludo" / "venv"
-    try:
-        if venv.exists() and exe.is_relative_to(venv.resolve()):
+    for hint in _install_path_hints():
+        normalized = hint.replace("\\", "/")
+        parts = Path(hint).parts
+        if "pipx" in parts:
+            return "pipx"
+        if "/uv/tools/" in normalized:
+            return "uv"
+        if "/ludo/venv/" in normalized:
             return "venv"
-    except (OSError, ValueError):
-        pass
     if source_repo() is not None:
         return "git"
     return "unknown"
+
+
+def _install_path_hints() -> list[str]:
+    hints: list[str] = []
+    seen: set[str] = set()
+
+    def add(raw: str | None) -> None:
+        if not raw:
+            return
+        path = Path(raw)
+        candidates = [path]
+        try:
+            if path.is_symlink():
+                target = path.readlink()
+                if not target.is_absolute():
+                    target = path.parent / target
+                candidates.append(target)
+        except OSError:
+            pass
+        for candidate in candidates:
+            text = str(candidate)
+            if text in seen:
+                continue
+            seen.add(text)
+            hints.append(text)
+
+    add(sys.executable)
+    if sys.argv:
+        add(sys.argv[0])
+    add(shutil.which("ludo"))
+    return hints
 
 
 def source_repo() -> Path | None:
