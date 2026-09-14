@@ -118,6 +118,35 @@ def describe_backend(brain: Brain | None) -> str:
     return brain.label
 
 
+def ollama_host() -> str:
+    return _ollama_host()
+
+
+def ollama_model() -> str:
+    return _ollama_model()
+
+
+def ollama_is_running(timeout: float = PROBE_TIMEOUT) -> bool:
+    try:
+        _get_json(f"{_ollama_host()}/api/tags", timeout=timeout)
+    except (OSError, TimeoutError, urllib.error.URLError, json.JSONDecodeError, ValueError):
+        return False
+    return True
+
+
+def ollama_model_names() -> list[str]:
+    try:
+        data = _get_json(f"{_ollama_host()}/api/tags", timeout=PROBE_TIMEOUT)
+    except (OSError, TimeoutError, urllib.error.URLError, json.JSONDecodeError, ValueError):
+        return []
+    names: list[str] = []
+    for item in data.get("models") or []:
+        name = str(item.get("name") or item.get("model") or "")
+        if name:
+            names.append(name)
+    return names
+
+
 def _ollama() -> OllamaBrain:
     return OllamaBrain(host=_ollama_host(), model=_ollama_model())
 

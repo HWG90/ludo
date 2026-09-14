@@ -18,7 +18,7 @@ You already know how to use a PC. You have a Steam library. You are tired of bei
 
 ## What you get
 
-- **Ask bar** — type a question at the bottom (`/` to focus). Uses a local Qwen model via Ollama if present, otherwise Gemini if `GEMINI_API_KEY` is set, otherwise Ludo’s own notes.
+- **Ask bar** — type a question at the bottom (`/` to focus). On first launch Ludo prompts to install Ollama, fetch a small Qwen model, and start it. Gemini is the cloud fallback if you set `GEMINI_API_KEY`.
 - **First week path** — eight short guides from "you already know this computer" through Steam and GPU drivers
 - **Windows → Linux glossary** — Super key, AppData, Recycle Bin, DirectX, the works
 - **Command Rosetta stone** — `ipconfig`, `dir`, `taskkill`, `robocopy`…
@@ -66,7 +66,7 @@ Inside a guide: `Esc` back, `c` mark complete.
 
 The ask bar always searches Ludo’s guides, glossary, commands, and this PC’s checkup. If a model is available, that material is the prompt — the model does not get a free-roam web.
 
-**Local Qwen (default when Ollama is running):**
+On first launch Ludo **asks** before touching Ollama: install it for your user (no sudo), download `qwen2.5:1.5b`, and start it so Ask is ready. Choose **Not now** or **Don’t ask again** anytime. After you say yes, later launches start the model in the background.
 
 ```bash
 # lightweight, ~1 GB. Bigger is LUDO_OLLAMA_MODEL=qwen2.5:7b
@@ -90,6 +90,7 @@ Auto order: Ollama if it answers on `localhost:11434`, else Gemini if a key is s
 src/ludo/
   ask.py              question routing (notes + optional model)
   llm.py              Ollama Qwen and Gemini backends
+  ollama_setup.py     first-launch install/start/pull prompts
   recommend.py        per-machine next steps
   content/guides/     the lessons
   content/glossary.py Windows ↔ Linux dictionary

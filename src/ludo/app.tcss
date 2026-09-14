@@ -181,10 +181,30 @@ Button.ghost {
     border: none;
 }
 
-#quiz-box {
-    background: #1c1916;
-    border: round #3a3226;
-    padding: 1 2;
-    margin-top: 1;
+#setup-card {
+    width: 72;
     height: auto;
+    max-height: 28;
+    background: #1c1916;
+    border: round #c9a227;
+    padding: 1 2;
+}
+
+SetupScreen, OllamaSetupScreen {
+    align: center middle;
+    background: #12110e 60%;
+}
+
+#setup-copy {
+    margin: 1 0;
+}
+
+#setup-actions {
+    height: auto;
+    margin-top: 1;
+}
+
+#setup-status {
+    margin-top: 1;
+    min-height: 1;
 }

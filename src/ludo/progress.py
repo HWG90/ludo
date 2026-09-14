@@ -11,6 +11,7 @@ from ludo.paths import progress_path
 class Progress:
     completed: set[str] = field(default_factory=set)
     quiz: dict[str, int] = field(default_factory=dict)
+    ollama_choice: str = ""
 
     def mark_complete(self, guide_id: str) -> None:
         self.completed.add(guide_id)
@@ -26,13 +27,15 @@ class Progress:
         return {
             "completed": sorted(self.completed),
             "quiz": dict(self.quiz),
+            "ollama_choice": self.ollama_choice,
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> Progress:
         completed = set(data.get("completed") or [])
         quiz = {str(k): int(v) for k, v in (data.get("quiz") or {}).items()}
-        return cls(completed=completed, quiz=quiz)
+        choice = str(data.get("ollama_choice") or "")
+        return cls(completed=completed, quiz=quiz, ollama_choice=choice)
 
 
 def load_progress(path: Path | None = None) -> Progress:

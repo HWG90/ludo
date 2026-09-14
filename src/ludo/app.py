@@ -9,8 +9,9 @@ from textual.worker import Worker, WorkerState
 from ludo.ask import Answer, answer_question
 from ludo.content.catalog import next_incomplete
 from ludo.llm import Brain, detect_backend
+from ludo.ollama_setup import inspect_ollama, should_autostart, should_prompt
 from ludo.probe import SystemProfile, probe
-from ludo.progress import Progress, load_progress
+from ludo.progress import Progress, load_progress, save_progress
 from ludo.ui.chat import AskBar, ChatTurn, ChatView
 from ludo.ui.checkup import CheckupView
 from ludo.ui.commands import CommandsView
@@ -91,6 +92,36 @@ class LudoApp(App):
             self.brain = None
             self.notify(str(exc), severity="warning", timeout=8)
         self.switch_view("home")
+        self._boot_ollama()
+
+    def _boot_ollama(self) -> None:
+        status = inspect_ollama()
+        if should_prompt(self.progress, status):
+            from ludo.ui.setup import OllamaSetupScreen
+
+            self.push_screen(OllamaSetupScreen(status), self._after_ollama_setup)
+            return
+        if should_autostart(self.progress, status):
+            self.run_worker(self._autostart_ollama, thread=True, exclusive=True, name="ollama-boot")
+
+    def _autostart_ollama(self) -> None:
+        from ludo.ollama_setup import ensure_ready
+
+        ensure_ready()
+
+    def _after_ollama_setup(self, result: str | None) -> None:
+        if result == "declined":
+            self.progress.ollama_choice = "declined"
+            save_progress(self.progress)
+            self.notify("Ask will use built-in notes. You can still set GEMINI_API_KEY later.")
+            return
+        if result == "accepted":
+            try:
+                self.brain = detect_backend()
+            except RuntimeError:
+                self.brain = None
+            self.notify("Qwen is ready. Press / and ask something.", timeout=6)
+            return
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id and event.button.id.startswith("nav-"):
@@ -128,6 +159,17 @@ class LudoApp(App):
         )
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        if event.worker.name == "ollama-boot":
+            if event.state is WorkerState.SUCCESS:
+                try:
+                    self.brain = detect_backend()
+                except RuntimeError:
+                    self.brain = None
+                self.notify("Qwen is loaded. Press / to ask.", timeout=5)
+            elif event.state is WorkerState.ERROR:
+                detail = str(event.worker.error) if event.worker.error else "Ollama did not start"
+                self.notify(detail, severity="warning", timeout=8)
+            return
         if event.worker.name != "ask":
             return
         if event.state is WorkerState.SUCCESS:
