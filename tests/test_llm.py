@@ -66,12 +66,54 @@ def test_ollama_complete(monkeypatch) -> None:
     def fake_post(url: str, payload: dict, timeout: float) -> dict:
         assert url.endswith("/api/chat")
         assert payload["model"] == "qwen2.5:1.5b"
+        options = payload["options"]
+        assert options["repeat_penalty"] >= 1.3
+        assert options["num_predict"] <= 160
         return {"message": {"content": "Use Proton in Steam compatibility."}}
 
     monkeypatch.setattr("ludo.llm._post_json", fake_post)
     brain = OllamaBrain(host="http://127.0.0.1:11434", model="qwen2.5:1.5b")
     text = brain.complete("what is proton", "note: Proton is Steam's Wine.", [])
     assert "Proton" in text
+
+
+def test_ollama_rejects_loop(monkeypatch) -> None:
+    from ludo.llm import looks_like_loop, tidy_reply
+
+    ramble = (
+        "Commands for Ludo include:\n"
+        "- `pacman`: For package management.\n"
+        "- `lspci`: To check hardware devices.\n"
+        "- `lsusb`: To check USB devices.\n"
+        "- `lspci` and `lsusb` can help identify missing drivers or firmware issues.\n"
+        "- `lspci` and `lsusb` can also show hidden files and file extensions.\n"
+        "- `lspci` and `lsusb` can be used to check for missing drivers or firmware issues.\n"
+        "- `lspci` and `lsusb` can show hidden files and file extensions.\n"
+        "- `lspci` and `lsusb` can help diagnose hardware issues, especially for GPUs and USB devices.\n"
+        "- `lspci` and `lsusb` can show hidden files and file extensions.\n"
+        "- `lspci` and `lsusb` can help diagnose hardware issues, especially for GPUs and USB devices.\n"
+    )
+    assert looks_like_loop(ramble, tidy_reply(ramble))
+
+    def fake_post(url: str, payload: dict, timeout: float) -> dict:
+        return {"message": {"content": ramble}}
+
+    monkeypatch.setattr("ludo.llm._post_json", fake_post)
+    brain = OllamaBrain(host="http://127.0.0.1:11434", model="qwen2.5:1.5b")
+    try:
+        brain.complete("commands for ludo", "notes: Ludo has a command map.", [])
+    except RuntimeError as exc:
+        assert "repetitive" in str(exc)
+    else:
+        raise AssertionError("looping reply should be rejected")
+
+
+def test_model_is_tiny() -> None:
+    from ludo.llm import model_is_tiny
+
+    assert model_is_tiny("qwen2.5:1.5b")
+    assert model_is_tiny("qwen2.5:3b")
+    assert not model_is_tiny("qwen2.5:7b")
 
 
 def test_gemini_complete(monkeypatch) -> None:

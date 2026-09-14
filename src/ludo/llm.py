@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -12,11 +13,35 @@ DEFAULT_GEMINI = "gemini-3.1-flash-lite"
 OLLAMA_TIMEOUT = 20
 GEMINI_TIMEOUT = 20
 PROBE_TIMEOUT = 0.4
+TINY_BILLION_PARAMS = 3.0
+_LINE_STOP = frozenset(
+    """
+    a an and are as at be but by can could do for from help in is it its of on or
+    the this to up used with also show check
+    """.split()
+)
 
 SYSTEM = """You are Ludo, a calm Linux guide for people coming from Windows — especially gamers using Steam and Proton.
-Answer using ONLY the notes. If the notes are thin, say so and point at a guide topic.
-Never pretend you ran a command. Never invent package names. Do not tell anyone to disable security features.
-Keep it short: a few sentences, maybe one command. No markdown tables."""
+
+Stay grounded:
+- Use ONLY the notes. If they are thin or say you do not know, say that in one or two sentences.
+- Never invent commands, flags, or package names. Never pretend you ran something.
+- Do not tell anyone to disable security features.
+
+Keep it short:
+- A few sentences, or at most five unique bullets.
+- Never repeat a bullet or rephrase the same fact.
+- If the user is joking, saying thanks, or saying "lol", reply with one short sentence — no lists.
+- Stop as soon as the question is answered. No markdown tables."""
+
+_OLLAMA_OPTIONS = {
+    "temperature": 0.1,
+    "top_p": 0.9,
+    "repeat_penalty": 1.35,
+    "repeat_last_n": 128,
+    "num_predict": 140,
+    "stop": ["\nYou\n", "\nYou:", "\nQuestion:"],
+}
 
 
 class Brain(Protocol):
@@ -38,24 +63,21 @@ class OllamaBrain:
 
     def complete(self, question: str, context: str, history: list[tuple[str, str]]) -> str:
         messages = [{"role": "system", "content": SYSTEM + "\n\nNotes:\n" + context}]
-        for role, text in history[-6:]:
+        for role, text in _usable_history(history):
             messages.append({"role": "user" if role == "you" else "assistant", "content": text})
         messages.append({"role": "user", "content": question})
         payload = {
             "model": self.model,
             "messages": messages,
             "stream": False,
-            "options": {"temperature": 0.2, "num_predict": 280},
+            "options": dict(_OLLAMA_OPTIONS),
         }
         data = _post_json(f"{self.host}/api/chat", payload, timeout=OLLAMA_TIMEOUT)
         error = data.get("error")
         if error:
             raise RuntimeError(str(error))
         message = data.get("message") or {}
-        text = (message.get("content") or "").strip()
-        if not text:
-            raise RuntimeError("Ollama returned an empty reply")
-        return text
+        return _finalize_reply(message.get("content") or "")
 
 
 @dataclass(frozen=True)
@@ -70,7 +92,7 @@ class GeminiBrain:
 
     def complete(self, question: str, context: str, history: list[tuple[str, str]]) -> str:
         contents: list[dict] = []
-        for role, text in history[-6:]:
+        for role, text in _usable_history(history):
             contents.append(
                 {
                     "role": "user" if role == "you" else "model",
@@ -81,7 +103,7 @@ class GeminiBrain:
         payload = {
             "system_instruction": {"parts": [{"text": SYSTEM}]},
             "contents": contents,
-            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 400},
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 220},
         }
         url = (
             "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -92,10 +114,7 @@ class GeminiBrain:
         if not candidates:
             raise RuntimeError("Gemini returned no candidates")
         parts = (((candidates[0] or {}).get("content") or {}).get("parts")) or []
-        text = "".join(str(part.get("text") or "") for part in parts).strip()
-        if not text:
-            raise RuntimeError("Gemini returned an empty reply")
-        return text
+        return _finalize_reply("".join(str(part.get("text") or "") for part in parts))
 
 
 def detect_backend(choice: str | None = None) -> Brain | None:
@@ -189,6 +208,104 @@ def _gemini_model() -> str:
 
 def _gemini_key() -> str:
     return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
+
+
+def model_is_tiny(model: str) -> bool:
+    match = re.search(r"(\d+(?:\.\d+)?)\s*b\b", model.lower())
+    if match is None:
+        return True
+    return float(match.group(1)) <= TINY_BILLION_PARAMS
+
+
+def tidy_reply(text: str) -> str:
+    kept: list[str] = []
+    seen: list[str] = []
+    nonempty = 0
+    for raw_line in text.replace("\r\n", "\n").split("\n"):
+        stripped = raw_line.strip()
+        if not stripped:
+            if kept and kept[-1] != "":
+                kept.append("")
+            continue
+        norm = _normalize_line(stripped)
+        if any(_similar_line(norm, previous) for previous in seen):
+            continue
+        seen.append(norm)
+        kept.append(stripped)
+        nonempty += 1
+        if nonempty >= 6:
+            break
+    while kept and kept[-1] == "":
+        kept.pop()
+    return "\n".join(kept).strip()
+
+
+def looks_like_loop(raw: str, cleaned: str | None = None) -> bool:
+    raw_lines = [line.strip() for line in raw.splitlines() if line.strip()]
+    if len(raw_lines) < 5:
+        return False
+    tidied = cleaned if cleaned is not None else tidy_reply(raw)
+    kept = [line.strip() for line in tidied.splitlines() if line.strip()]
+    dropped = len(raw_lines) - len(kept)
+    if dropped >= 3 and len(kept) <= len(raw_lines) * 0.7:
+        return True
+    norms = [_normalize_line(line) for line in raw_lines]
+    token_hits: dict[str, int] = {}
+    for norm in norms:
+        if len(norm) < 24:
+            continue
+        copies = sum(1 for other in norms if _similar_line(norm, other))
+        if copies >= 4:
+            return True
+        for token in _content_tokens(norm):
+            token_hits[token] = token_hits.get(token, 0) + 1
+    return sum(1 for count in token_hits.values() if count >= 4) >= 2
+
+
+def _usable_history(history: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    usable: list[tuple[str, str]] = []
+    for role, text in history:
+        stripped = (text or "").strip()
+        if not stripped or stripped in {"Thinking…", "Thinking..."}:
+            continue
+        if role != "you" and looks_like_loop(stripped):
+            continue
+        usable.append((role, stripped))
+    return usable[-4:]
+
+
+def _finalize_reply(text: str) -> str:
+    raw = (text or "").strip()
+    cleaned = tidy_reply(raw)
+    if not cleaned:
+        raise RuntimeError("empty reply")
+    if looks_like_loop(raw, cleaned):
+        raise RuntimeError("repetitive reply")
+    return cleaned
+
+
+def _normalize_line(line: str) -> str:
+    text = re.sub(r"^[-*•]+\s+", "", line.strip())
+    text = re.sub(r"`+", "", text)
+    return re.sub(r"\s+", " ", text).lower()
+
+
+def _content_tokens(line: str) -> set[str]:
+    return {token for token in line.split() if token not in _LINE_STOP and len(token) > 2}
+
+
+def _similar_line(left: str, right: str) -> bool:
+    if left == right:
+        return True
+    if len(left) > 20 and len(right) > 20 and (left in right or right in left):
+        return True
+    left_tokens = _content_tokens(left)
+    right_tokens = _content_tokens(right)
+    if min(len(left_tokens), len(right_tokens)) < 2:
+        return False
+    overlap = len(left_tokens & right_tokens)
+    union = len(left_tokens | right_tokens)
+    return union > 0 and overlap / union >= 0.5
 
 
 def _get_json(url: str, timeout: float) -> dict:
