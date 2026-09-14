@@ -1,0 +1,14 @@
+---
+description: Bump the package version whenever a change is shipped
+alwaysApply: true
+---
+
+# Version bump on ship
+
+Every shipped change (commit/push to `master`, or a user-facing release) must increment the version. The in-app updater compares version numbers, not commits.
+
+- Patch `0.1.x` for fixes and small behavior changes
+- Minor `0.x.0` for new features
+- Keep these in lockstep: `pyproject.toml` `version`, `src/ludo/__init__.py` `__version__`, and `packaging/arch/PKGBUILD` (`pkgver` and `pkgver()`)
+- Include the bump in the same commit as the change when possible
+- Do not ship code on `master` with the previous version still set
