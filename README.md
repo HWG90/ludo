@@ -1,5 +1,5 @@
 <img width="1865" height="1087" alt="Screenshot_20260914_111148" src="https://github.com/user-attachments/assets/ec2a61ba-ae31-4ae3-b3d0-2b562e0b33fe" />
-# Ludo
+## Ludo
 
 Interactive terminal guide for people moving from Windows to Linux as a daily driver — same machine, new layout.
 
