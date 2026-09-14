@@ -1,9 +1,22 @@
 from pathlib import Path
 
-from ludo.ollama_setup import OllamaStatus, llm_setup_disabled, prompt_copy, should_autostart, should_prompt
+from ludo.ollama_setup import (
+    OllamaStatus,
+    llm_setup_disabled,
+    model_on_disk,
+    prompt_copy,
+    should_autostart,
+    should_prompt,
+)
 from ludo.progress import Progress
 
 MISSING = OllamaStatus(binary=None, running=False, model_present=False, model="qwen2.5:1.5b")
+INSTALLED = OllamaStatus(
+    binary=Path("/usr/bin/ollama"),
+    running=False,
+    model_present=True,
+    model="qwen2.5:1.5b",
+)
 READY = OllamaStatus(
     binary=Path("/usr/bin/ollama"),
     running=True,
@@ -21,6 +34,15 @@ def test_no_prompt_when_ready(monkeypatch) -> None:
     monkeypatch.setenv("LUDO_LLM", "auto")
     assert READY.ready
     assert not should_prompt(Progress(), READY)
+    assert not should_autostart(Progress(), READY)
+
+
+def test_no_prompt_when_installed_with_model(monkeypatch) -> None:
+    monkeypatch.setenv("LUDO_LLM", "auto")
+    assert not INSTALLED.ready
+    assert not should_prompt(Progress(), INSTALLED)
+    assert should_autostart(Progress(), INSTALLED)
+    assert not should_prompt(Progress(ollama_choice=""), INSTALLED)
 
 
 def test_declined_never_prompts(monkeypatch) -> None:
@@ -103,3 +125,13 @@ def test_stop_leaves_foreign_ollama_alone(monkeypatch, tmp_path) -> None:
 
     setup.stop_ludo_ollama()
     assert called == []
+
+
+def test_model_on_disk_reads_ollama_manifests(monkeypatch, tmp_path) -> None:
+    models = tmp_path / "models"
+    manifest = models / "manifests" / "registry.ollama.ai" / "library" / "qwen2.5" / "1.5b"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text("{}")
+    monkeypatch.setenv("OLLAMA_MODELS", str(models))
+    assert model_on_disk("qwen2.5:1.5b")
+    assert not model_on_disk("llama3:8b")

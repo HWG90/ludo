@@ -48,7 +48,10 @@ class OllamaStatus:
 def inspect_ollama() -> OllamaStatus:
     model = ollama_model()
     running = ollama_is_running()
-    present = running and _has_model(model, ollama_model_names())
+    if running:
+        present = _has_model(model, ollama_model_names())
+    else:
+        present = model_on_disk(model)
     return OllamaStatus(
         binary=find_ollama(),
         running=running,
@@ -84,10 +87,16 @@ def llm_setup_disabled() -> bool:
     return choice in {"off", "none", "notes", "false", "0", "gemini", "google"}
 
 
+def have_install_and_model(status: OllamaStatus) -> bool:
+    return bool(status.binary) and status.model_present
+
+
 def should_prompt(progress: Progress, status: OllamaStatus) -> bool:
     if llm_setup_disabled():
         return False
     if progress.ollama_choice == "declined":
+        return False
+    if have_install_and_model(status):
         return False
     return not status.ready
 
@@ -95,6 +104,8 @@ def should_prompt(progress: Progress, status: OllamaStatus) -> bool:
 def should_autostart(progress: Progress, status: OllamaStatus) -> bool:
     if llm_setup_disabled():
         return False
+    if have_install_and_model(status):
+        return not status.ready
     if progress.ollama_choice != "accepted":
         return False
     return True
@@ -129,6 +140,29 @@ def prompt_copy(status: OllamaStatus) -> str:
 def _has_model(wanted: str, names: list[str]) -> bool:
     needle = wanted.lower()
     return any(needle == name.lower() or name.lower().startswith(needle) for name in names)
+
+
+def ollama_models_dir() -> Path:
+    raw = os.environ.get("OLLAMA_MODELS")
+    if raw:
+        return Path(raw)
+    return Path.home() / ".ollama" / "models"
+
+
+def model_on_disk(model: str) -> bool:
+    name, _, tag = model.partition(":")
+    tag = tag or "latest"
+    manifests = ollama_models_dir() / "manifests"
+    if not manifests.is_dir():
+        return False
+    wanted_name = name.lower()
+    wanted_tag = tag.lower()
+    for path in manifests.rglob("*"):
+        if not path.is_file():
+            continue
+        if path.name.lower() == wanted_tag and path.parent.name.lower() == wanted_name:
+            return True
+    return False
 
 
 def download_url() -> str:

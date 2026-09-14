@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 
 from ludo.app import LudoApp
 from ludo.ollama_setup import OllamaStatus
@@ -81,6 +82,26 @@ def test_ollama_setup_prompt(monkeypatch) -> None:
             await pilot.pause()
             assert isinstance(app.screen, OllamaSetupScreen)
             await pilot.press("n")
+            await pilot.pause()
+            assert not isinstance(app.screen, OllamaSetupScreen)
+
+    asyncio.run(scenario())
+
+
+def test_no_ollama_setup_when_already_installed(monkeypatch) -> None:
+    monkeypatch.setenv("LUDO_LLM", "auto")
+    installed = OllamaStatus(
+        binary=Path("/usr/bin/ollama"),
+        running=False,
+        model_present=True,
+        model="qwen2.5:1.5b",
+    )
+    monkeypatch.setattr("ludo.app.inspect_ollama", lambda: installed)
+    monkeypatch.setattr("ludo.ollama_setup.ensure_ready", lambda: installed)
+
+    async def scenario() -> None:
+        app = LudoApp(profile=make_profile(), progress=Progress())
+        async with app.run_test() as pilot:
             await pilot.pause()
             assert not isinstance(app.screen, OllamaSetupScreen)
 
