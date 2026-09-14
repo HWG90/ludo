@@ -29,21 +29,40 @@ Progress is saved locally in `~/.local/share/ludo/progress.json`.
 
 ## Install
 
-Needs Python 3.11+ on Linux.
+Needs Python 3.11+ on Linux. Pick one:
+
+**One line** (friends, Steam Deck, a fresh CachyOS box):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/HWG90/ludo/master/scripts/install.sh | bash
+```
+
+That uses `pipx` or `uv` if you have them, otherwise a venv under `~/.local`. No sudo.
+
+**pipx** (best if you already live in Python tools):
+
+```bash
+pipx install git+https://github.com/HWG90/ludo.git
+ludo
+```
+
+**uv**:
+
+```bash
+uv tool install git+https://github.com/HWG90/ludo.git
+ludo
+```
+
+**From a clone** (hacking on it):
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install -e ".[dev]"
 ludo
 ```
 
-With [uv](https://github.com/astral-sh/uv):
-
-```bash
-uv sync --extra dev
-uv run ludo
-```
+Arch / CachyOS: a starting PKGBUILD is in `packaging/arch/`. PyPI (`pipx install ludo-linux`) is the next publish step once a release is uploaded.
 
 ## Keyboard (in the UI)
 

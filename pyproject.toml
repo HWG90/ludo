@@ -33,7 +33,9 @@ dev = [
 ludo = "ludo.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/ludo-linux/ludo"
+Homepage = "https://github.com/HWG90/ludo"
+Repository = "https://github.com/HWG90/ludo"
+Issues = "https://github.com/HWG90/ludo/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
